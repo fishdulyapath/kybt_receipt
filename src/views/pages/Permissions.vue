@@ -119,7 +119,7 @@ async function handleSearch() {
 <template>
     <div>
         <div class="card">
-            <h5>จัดการสิทธิ์ผู้ใช้</h5>
+            <div class="font-semibold text-xl mb-2">จัดการสิทธิ์ผู้ใช้</div>
             <p class="text-muted-color">กำหนดสิทธิ์การเข้าถึงหน้าต่างๆ ในระบบสำหรับผู้ใช้แต่ละคน</p>
 
             <Toolbar class="mb-6">
