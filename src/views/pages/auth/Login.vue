@@ -9,10 +9,10 @@ const router = useRouter();
 const toast = useToast();
 
 // Form fields
-const provider_name = ref('data');
-const database_name = ref('new_data_2');
-const user_code = ref('superadmin');
-const password = ref('smladmin');
+const provider_name = ref('');
+const database_name = ref('');
+const user_code = ref('');
+const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
 
