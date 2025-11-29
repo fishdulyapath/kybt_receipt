@@ -12,7 +12,8 @@ const router = createRouter({
             children: [
                 {
                     path: '/',
-                    redirect: '/pages/receivedoc'
+                    name: 'dashboard',
+                    component: () => import('@/views/Dashboard.vue')
                 },
                 {
                     path: '/uikit/formlayout',

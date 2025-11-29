@@ -1,7 +1,7 @@
 <script setup>
 import ReceiveDocService from '@/service/ReceiveDocService';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
@@ -40,7 +40,15 @@ const showSummaryDialog = ref(false);
 // SO Details toggle
 const showSODetails = ref(false);
 
+// Responsive state
+const isMobile = ref(window.innerWidth < 768);
+
+function handleResize() {
+    isMobile.value = window.innerWidth < 768;
+}
+
 onMounted(async () => {
+    window.addEventListener('resize', handleResize);
     if (!docno.value) {
         toast.add({
             severity: 'error',
@@ -215,14 +223,16 @@ async function processBarcodeInput() {
                 });
             }
 
+            // ใช้ barcode และ item_year ที่ parse จาก input ที่สแกนเข้ามา
+            // ไม่ใช้จาก API เพราะ API อาจส่ง barcode เดิมกลับมาเสมอ
             // เพิ่มสินค้าตามจำนวนที่สแกน (หรือจำนวนที่เหลือ)
             let addedCount = 0;
             for (let i = 0; i < actualQty; i++) {
                 const success = addItemToScanned(
                     {
                         ...item,
-                        barcode: barcode,
-                        item_year: item_year,
+                        barcode: barcode, // ใช้ barcode จาก input ที่ parse แล้ว
+                        item_year: item_year, // ใช้ item_year จาก input ที่ parse แล้ว
                         qty: 1
                     },
                     false
@@ -274,23 +284,12 @@ async function handleSearch(event) {
 
     searchLoading.value = true;
     try {
-        // แยก barcode และ year ถ้ามี #
-        let searchTerm = query.trim();
-        let year = '';
-
-        if (searchTerm.includes('#')) {
-            const parts = searchTerm.split('#');
-            searchTerm = parts[0];
-            year = parts[1] || '';
-        }
-
+        const searchTerm = query.trim();
         const result = await ReceiveDocService.getItemSearch(searchTerm);
 
         if (result.success && result.data && result.data.length > 0) {
-            searchResults.value = result.data.map((item) => ({
-                ...item,
-                item_year: year
-            }));
+            // ใช้ข้อมูลจาก API ตรงๆ ไม่ต้อง map item_year
+            searchResults.value = result.data;
         } else {
             searchResults.value = [];
         }
@@ -352,24 +351,78 @@ function addItemToScanned(item, showToast = true) {
         return false;
     }
 
-    // เพิ่มสินค้า
-    scannedItems.value.push({
-        item_code: item.item_code,
-        item_name: item.item_name || '',
-        unit_code: item.unit_code,
-        barcode: item.barcode || item.item_code,
-        item_year: item.item_year || '',
-        qty: item.qty || 1,
-        max_qty: maxQty
-    });
+    // ใช้ barcode และ item_year ที่ส่งมา หรือแยกจาก barcode ถ้ายังไม่ได้แยก
+    let barcode = item.barcode || item.item_code;
+    let item_year = item.item_year || '';
 
-    if (showToast) {
-        toast.add({
-            severity: 'success',
-            summary: 'Success',
-            detail: `เพิ่มสินค้า ${item.item_code}`,
-            life: 2000
+    // ถ้า barcode ยังมี # อยู่ (ยังไม่ได้แยก) ให้แยกออก
+    if (barcode.includes('#')) {
+        const parts = barcode.split('#');
+        barcode = parts[0];
+        item_year = parts[1] || '';
+    }
+
+    console.log('=== addItemToScanned ===');
+    console.log('Input item:', item);
+    console.log('Parsed barcode:', barcode);
+    console.log('Parsed item_year:', item_year);
+    console.log('Current scannedItems:', JSON.stringify(scannedItems.value.map((i) => ({ item_code: i.item_code, barcode: i.barcode, item_year: i.item_year }))));
+
+    // ตรวจสอบว่ามีสินค้านี้อยู่แล้วหรือไม่ (เช็คทั้ง item_code และ item_year)
+    const existingItemIndex = scannedItems.value.findIndex((i) => i.item_code === item.item_code && i.item_year === item_year);
+
+    console.log('Existing item index:', existingItemIndex);
+
+    if (existingItemIndex !== -1) {
+        // มีสินค้าอยู่แล้ว - เพิ่มจำนวนในรายการเดิม
+        const existingItem = scannedItems.value[existingItemIndex];
+        const newQty = existingItem.qty + (item.qty || 1);
+
+        // คำนวณจำนวนรวมของสินค้าชนิดเดียวกัน (รวมทั้งหมด)
+        const otherQty = scannedItems.value.filter((i, idx) => idx !== existingItemIndex && i.item_code === item.item_code).reduce((sum, i) => sum + i.qty, 0);
+
+        if (newQty + otherQty > maxQty) {
+            if (showToast) {
+                toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: `ไม่สามารถรับเกิน ${maxQty} ${item.unit_code}`,
+                    life: 3000
+                });
+            }
+            return false;
+        }
+
+        scannedItems.value[existingItemIndex].qty = newQty;
+
+        if (showToast) {
+            toast.add({
+                severity: 'info',
+                summary: 'Updated',
+                detail: `อัพเดทจำนวนสินค้า ${item.item_code} เป็น ${newQty}`,
+                life: 2000
+            });
+        }
+    } else {
+        // ไม่มีสินค้านี้ - เพิ่มรายการใหม่
+        scannedItems.value.push({
+            item_code: item.item_code,
+            item_name: item.item_name || '',
+            unit_code: item.unit_code,
+            barcode: barcode,
+            item_year: item_year,
+            qty: item.qty || 1,
+            max_qty: maxQty
         });
+
+        if (showToast) {
+            toast.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: `เพิ่มสินค้า ${item.item_code}`,
+                life: 2000
+            });
+        }
     }
 
     return true;
@@ -402,20 +455,10 @@ function updateQty(index, newQty) {
 
 // แสดง Summary Dialog
 function showSummary() {
-    if (scannedItems.value.length === 0) {
-        toast.add({
-            severity: 'warn',
-            summary: 'Warning',
-            detail: 'กรุณาเพิ่มสินค้าก่อนบันทึก',
-            life: 3000
-        });
-        return;
-    }
-
     showSummaryDialog.value = true;
 }
 
-// สรุปข้อมูลสินค้าที่จะบันทึก (group by item_code)
+// สรุปข้อมูลสินค้าที่จะบันทึก (รายละเอียดทุก barcode และปี)
 const summaryItems = computed(() => {
     const grouped = {};
 
@@ -425,11 +468,17 @@ const summaryItems = computed(() => {
                 item_code: item.item_code,
                 item_name: item.item_name,
                 unit_code: item.unit_code,
-                qty: 0,
-                max_qty: item.max_qty
+                total_qty: 0,
+                max_qty: item.max_qty,
+                details: [] // เก็บรายละเอียดแต่ละ barcode/ปี
             };
         }
-        grouped[item.item_code].qty += item.qty;
+        grouped[item.item_code].total_qty += item.qty;
+        grouped[item.item_code].details.push({
+            barcode: item.barcode,
+            item_year: item.item_year,
+            qty: item.qty
+        });
     });
 
     return Object.values(grouped);
@@ -504,44 +553,52 @@ async function saveReceiveDoc() {
             life: 3000
         });
     }
-} // ยกเลิกและกลับไปหน้ารายการ
+}
+
+// ยกเลิกและกลับไปหน้ารายการ
 function cancelAndGoBack() {
     router.push({ name: 'receivedoc' });
 }
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize);
+});
 </script>
 
 <template>
-    <ConfirmDialog />
     <div class="min-h-screen bg-surface-50 dark:bg-surface-900">
         <!-- Fixed Header - Enlarged -->
         <div class="sticky top-0 z-10 bg-surface-0 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700 shadow-md">
             <!-- Top Bar with Document Info and Actions -->
-            <div class="flex items-center justify-between p-4 border-b border-surface-200 dark:border-surface-700">
-                <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <Button icon="pi pi-arrow-left" text rounded @click="cancelAndGoBack" />
+            <div class="flex items-center justify-between p-3 md:p-4 border-b border-surface-200 dark:border-surface-700">
+                <div class="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                    <Button icon="pi pi-arrow-left" text rounded @click="cancelAndGoBack" size="small" class="md:size-default" />
                     <div class="flex-1 min-w-0">
-                        <div class="font-bold text-lg text-primary truncate">{{ docno }}</div>
+                        <div class="font-bold text-base md:text-lg text-primary truncate">{{ docno }}</div>
                     </div>
                 </div>
-                <div class="flex items-center gap-2">
-                    <Button icon="pi pi-list" text rounded @click="showSODetails = true" v-badge.danger="soDetails.length" v-tooltip.bottom="'ดูรายการ SO'" />
-                    <Button label="บันทึก" icon="pi pi-check" severity="success" @click="showSummary" :disabled="scannedItems.length === 0" />
+                <div class="flex items-center gap-1 md:gap-2">
+                    <Button icon="pi pi-list" text rounded @click="showSODetails = true" v-badge.danger="soDetails.length" v-tooltip.bottom="'ดูรายการ SO'" size="small" class="md:size-default" />
+                    <!-- Mobile: Icon only -->
+                    <Button v-if="isMobile" label="บันทึก" icon="pi pi-check" severity="success" @click="showSummary" size="small" />
+                    <!-- Desktop: With label -->
+                    <Button v-else label="บันทึก" icon="pi pi-check" severity="success" @click="showSummary" />
                 </div>
             </div>
 
             <!-- Progress Section -->
-            <div class="px-4 py-3 bg-surface-50 dark:bg-surface-900">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="font-semibold">ความคืบหน้าการรับสินค้า</span>
-                    <span class="text-sm text-muted-color">{{ totalScannedQty }} / {{ totalSOQty }} ชิ้น</span>
+            <div class="px-3 py-2 md:px-4 md:py-3 bg-surface-50 dark:bg-surface-900">
+                <div class="flex items-center justify-between mb-1.5 md:mb-2">
+                    <span class="text-sm md:text-base font-semibold">ความคืบหน้า</span>
+                    <span class="text-xs md:text-sm text-muted-color">{{ totalScannedQty }} / {{ totalSOQty }} ชิ้น</span>
                 </div>
-                <ProgressBar :value="progressPercentage" :showValue="false" class="h-3 mb-2" />
-                <div class="text-sm text-center font-semibold" :class="progressPercentage === 100 ? 'text-success' : 'text-primary'">{{ progressPercentage.toFixed(1) }}% เสร็จสิ้น</div>
+                <ProgressBar :value="progressPercentage" :showValue="false" class="h-2 md:h-3 mb-1 md:mb-2" />
+                <div class="text-xs md:text-sm text-center font-semibold" :class="progressPercentage === 100 ? 'text-success' : 'text-primary'">{{ progressPercentage.toFixed(1) }}%</div>
             </div>
 
             <!-- Input Mode Selection -->
-            <div class="px-4 py-3">
-                <SelectButton v-model="inputMode" :options="inputModes" optionLabel="name" optionValue="value" fluid>
+            <div class="px-3 py-2 md:px-4 md:py-3">
+                <SelectButton v-model="inputMode" :options="inputModes" optionLabel="name" optionValue="value" fluid size="small" class="md:size-default">
                     <template #option="slotProps">
                         <i :class="slotProps.option.icon" class="mr-2"></i>
                         <span>{{ slotProps.option.name }}</span>
@@ -550,19 +607,15 @@ function cancelAndGoBack() {
             </div>
 
             <!-- Barcode Scanner Input -->
-            <div v-if="inputMode === 'barcode'" class="px-4 pb-4">
+            <div v-if="inputMode === 'barcode'" class="px-3 pb-3 md:px-4 md:pb-4">
                 <IconField>
                     <InputIcon class="pi pi-qrcode" />
-                    <InputText v-model="barcodeInput" @keyup.enter="processBarcodeInput" placeholder="Scan Barcode..." fluid class="text-lg font-mono" :disabled="searchLoading" autofocus />
+                    <InputText v-model="barcodeInput" @keyup.enter="processBarcodeInput" placeholder="Scan Barcode..." fluid class="text-base md:text-lg font-mono" :disabled="searchLoading" autofocus />
                 </IconField>
-                <div class="text-xs text-muted-color mt-2 flex items-center gap-2">
-                    <i class="pi pi-info-circle"></i>
-                    <span>รูปแบบ: [จำนวน*]barcode[#ปี] เช่น 04-101-0000539#2024 หรือ 10*04-101-0000539#2024 </span>
-                </div>
             </div>
 
             <!-- AutoComplete Search -->
-            <div v-if="inputMode === 'search'" class="px-4 pb-4">
+            <div v-if="inputMode === 'search'" class="px-3 pb-3 md:px-4 md:pb-4">
                 <IconField>
                     <InputIcon class="pi pi-search" />
                     <AutoComplete
@@ -662,24 +715,24 @@ function cancelAndGoBack() {
             </template>
 
             <!-- Stats Summary -->
-            <div class="grid grid-cols-3 gap-3 mb-4">
-                <div class="bg-primary-100 dark:bg-primary-900/30 rounded-lg p-3 text-center">
-                    <div class="text-xs text-primary-600 dark:text-primary-400 mb-1">รายการทั้งหมด</div>
-                    <div class="text-2xl font-bold text-primary">{{ soDetails.length }}</div>
+            <div class="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
+                <div class="bg-primary-100 dark:bg-primary-900/30 rounded-lg p-2 md:p-3 text-center">
+                    <div class="text-[10px] md:text-xs text-primary-600 dark:text-primary-400 mb-1">รายการทั้งหมด</div>
+                    <div class="text-lg md:text-2xl font-bold text-primary">{{ soDetails.length }}</div>
                 </div>
-                <div class="bg-success-100 dark:bg-success-900/30 rounded-lg p-3 text-center">
-                    <div class="text-xs text-success-600 dark:text-success-400 mb-1">ยอดรวม SO</div>
-                    <div class="text-2xl font-bold text-success">{{ totalSOQty }}</div>
+                <div class="bg-success-100 dark:bg-success-900/30 rounded-lg p-2 md:p-3 text-center">
+                    <div class="text-[10px] md:text-xs text-success-600 dark:text-success-400 mb-1">ยอดรวม SO</div>
+                    <div class="text-lg md:text-2xl font-bold text-success">{{ totalSOQty }}</div>
                 </div>
-                <div class="bg-orange-100 dark:bg-orange-900/30 rounded-lg p-3 text-center">
-                    <div class="text-xs text-orange-600 dark:text-orange-400 mb-1">รับแล้ว</div>
-                    <div class="text-2xl font-bold text-orange-600 dark:text-orange-400">{{ totalScannedQty }}</div>
+                <div class="bg-orange-100 dark:bg-orange-900/30 rounded-lg p-2 md:p-3 text-center">
+                    <div class="text-[10px] md:text-xs text-orange-600 dark:text-orange-400 mb-1">รับแล้ว</div>
+                    <div class="text-lg md:text-2xl font-bold text-orange-600 dark:text-orange-400">{{ totalScannedQty }}</div>
                 </div>
             </div>
 
             <!-- SO Items List -->
-            <div class="space-y-3">
-                <div v-for="(so, idx) in soDetails" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 p-4">
+            <div class="space-y-2 md:space-y-3">
+                <div v-for="(so, idx) in soDetails" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 p-3 md:p-4">
                     <!-- Item Header -->
                     <div class="flex items-start justify-between mb-3">
                         <div class="flex-1 min-w-0">
@@ -690,20 +743,20 @@ function cancelAndGoBack() {
                     </div>
 
                     <!-- Quantity Stats -->
-                    <div class="grid grid-cols-3 gap-3">
-                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
-                            <div class="text-xs text-blue-600 dark:text-blue-400 mb-1">จำนวน SO</div>
-                            <div class="text-xl font-bold text-blue-600 dark:text-blue-400">{{ so.qty }}</div>
+                    <div class="grid grid-cols-3 gap-2 md:gap-3">
+                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 md:p-3 text-center">
+                            <div class="text-[10px] md:text-xs text-blue-600 dark:text-blue-400 mb-1">จำนวน SO</div>
+                            <div class="text-base md:text-xl font-bold text-blue-600 dark:text-blue-400">{{ so.qty }}</div>
                         </div>
-                        <div :class="['rounded-lg p-3 text-center', getScannedQty(so.item_code) >= parseInt(so.qty) ? 'bg-green-50 dark:bg-green-900/20' : 'bg-orange-50 dark:bg-orange-900/20']">
-                            <div class="text-xs mb-1" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">รับแล้ว</div>
-                            <div class="text-xl font-bold" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">
+                        <div :class="['rounded-lg p-2 md:p-3 text-center', getScannedQty(so.item_code) >= parseInt(so.qty) ? 'bg-green-50 dark:bg-green-900/20' : 'bg-orange-50 dark:bg-orange-900/20']">
+                            <div class="text-[10px] md:text-xs mb-1" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">รับแล้ว</div>
+                            <div class="text-base md:text-xl font-bold" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">
                                 {{ getScannedQty(so.item_code) }}
                             </div>
                         </div>
-                        <div class="bg-surface-100 dark:bg-surface-700 rounded-lg p-3 text-center">
-                            <div class="text-xs text-muted-color mb-1">คงเหลือ</div>
-                            <div class="text-xl font-bold">{{ getRemainingQty(so.item_code) }}</div>
+                        <div class="bg-surface-100 dark:bg-surface-700 rounded-lg p-2 md:p-3 text-center">
+                            <div class="text-[10px] md:text-xs text-muted-color mb-1">คงเหลือ</div>
+                            <div class="text-base md:text-xl font-bold">{{ getRemainingQty(so.item_code) }}</div>
                         </div>
                     </div>
 
@@ -737,16 +790,32 @@ function cancelAndGoBack() {
                 <span class="font-semibold text-primary ml-1">{{ docno }}</span>
             </div>
 
-            <div class="space-y-2">
-                <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-2 border border-surface-200 dark:border-surface-700">
-                    <div class="flex items-center justify-between mb-1">
+            <div class="space-y-3">
+                <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 border border-surface-200 dark:border-surface-700">
+                    <!-- Item Header -->
+                    <div class="flex items-center justify-between mb-2">
                         <div class="font-semibold text-sm text-primary">{{ item.item_code }}</div>
                         <Tag :value="item.unit_code" severity="secondary" class="text-xs" />
                     </div>
                     <div class="text-xs text-muted-color mb-2 truncate">{{ item.item_name }}</div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs text-muted-color">จำนวน:</span>
-                        <Tag :value="`${item.qty} / ${item.max_qty}`" :severity="item.qty === item.max_qty ? 'success' : 'warning'" class="text-xs" />
+
+                    <!-- Total Quantity -->
+                    <div class="flex items-center justify-between mb-2 pb-2 border-b border-surface-200 dark:border-surface-700">
+                        <span class="text-xs font-semibold text-muted-color">จำนวนรวม:</span>
+                        <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-xs" />
+                    </div>
+
+                    <!-- Barcode Details -->
+                    <div class="space-y-1.5">
+                        <div class="text-[10px] font-semibold text-muted-color mb-1">รายละเอียด Barcode:</div>
+                        <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="bg-surface-0 dark:bg-surface-900 rounded p-2 flex items-center justify-between">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
+                                <i class="pi pi-qrcode text-xs text-primary"></i>
+                                <span class="font-mono font-semibold text-xs text-primary truncate">{{ detail.barcode }}</span>
+                                <span v-if="detail.item_year" class="text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded">#{{ detail.item_year }}</span>
+                            </div>
+                            <Tag :value="`x${detail.qty}`" severity="info" class="text-xs ml-2" />
+                        </div>
                     </div>
                 </div>
             </div>

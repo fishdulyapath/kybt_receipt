@@ -14,19 +14,17 @@ onMounted(() => {
 const model = computed(() => {
     const menu = [];
 
-    // เพิ่มเมนู "กำหนดสิทธิ์" เฉพาะ SUPERADMIN
-    if (isSuperAdmin.value) {
-        menu.push({
-            label: 'Admin',
-            items: [
-                {
-                    label: 'กำหนดสิทธิ์',
-                    icon: 'pi pi-fw pi-shield',
-                    to: '/pages/permissions'
-                }
-            ]
-        });
-    }
+    // Dashboard - แสดงทุกคน
+    menu.push({
+        label: 'หน้าหลัก',
+        items: [
+            {
+                label: 'Dashboard',
+                icon: 'pi pi-fw pi-home',
+                to: '/'
+            }
+        ]
+    });
 
     // เมนูหลักสำหรับ Production
     if (permissions.value && permissions.value.receive_screen === '1') {
@@ -34,19 +32,33 @@ const model = computed(() => {
             label: 'เมนูหลัก',
             items: [
                 {
-                    label: 'ใบรับสินค้า',
+                    label: 'รับสินค้าจาก SO',
                     icon: 'pi pi-fw pi-file-check',
                     to: '/pages/receivedoc'
                 },
                 {
-                    label: 'ปิดงานใบรับ',
+                    label: 'รายการรับสินค้า',
                     icon: 'pi pi-fw pi-check-circle',
                     to: '/pages/closejobreceive'
                 },
                 {
-                    label: 'ประวัติใบรับ',
+                    label: 'ประวัติ',
                     icon: 'pi pi-fw pi-history',
                     to: '/pages/receivehistory'
+                }
+            ]
+        });
+    }
+
+    // เพิ่มเมนู "กำหนดสิทธิ์" เฉพาะ SUPERADMIN
+    if (isSuperAdmin.value) {
+        menu.push({
+            label: 'Admin',
+            items: [
+                {
+                    label: 'กำหนดสิทธิ์เข้าเมนู',
+                    icon: 'pi pi-fw pi-shield',
+                    to: '/pages/permissions'
                 }
             ]
         });
