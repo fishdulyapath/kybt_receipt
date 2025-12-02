@@ -1,9 +1,9 @@
 <script setup>
 import FloatingConfigurator from '@/components/FloatingConfigurator.vue';
 import AuthService from '@/service/AuthService';
+import { useToast } from 'primevue/usetoast';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { useToast } from 'primevue/usetoast';
 
 const router = useRouter();
 const toast = useToast();
@@ -117,12 +117,12 @@ const handleLogin = async () => {
                     <form @submit.prevent="handleLogin">
                         <div class="mb-6">
                             <label for="provider" class="block text-surface-900 dark:text-surface-0 font-medium mb-2">Provider Name</label>
-                            <InputText id="provider" type="text" v-model="provider_name" class="w-full md:w-[30rem]" disabled />
+                            <InputText id="provider" type="text" v-model="provider_name" class="w-full md:w-[30rem]" />
                         </div>
 
                         <div class="mb-6">
                             <label for="database" class="block text-surface-900 dark:text-surface-0 font-medium mb-2">Database Name</label>
-                            <InputText id="database" type="text" v-model="database_name" class="w-full md:w-[30rem]" disabled />
+                            <InputText id="database" type="text" v-model="database_name" class="w-full md:w-[30rem]" />
                         </div>
 
                         <div class="mb-6">
