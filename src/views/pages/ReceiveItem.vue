@@ -464,10 +464,15 @@ const summaryItems = computed(() => {
 
     scannedItems.value.forEach((item) => {
         if (!grouped[item.item_code]) {
+            // หาข้อมูล item_year จาก SO
+            const soItem = soDetails.value.find((so) => so.item_code === item.item_code);
+            const soItemYear = soItem?.item_year || '';
+            
             grouped[item.item_code] = {
                 item_code: item.item_code,
                 item_name: item.item_name,
                 unit_code: item.unit_code,
+                item_year_so: soItemYear, // ปียางจาก SO
                 total_qty: 0,
                 max_qty: item.max_qty,
                 details: [] // เก็บรายละเอียดแต่ละ barcode/ปี
@@ -504,11 +509,6 @@ const progressPercentage = computed(() => {
 async function saveReceiveDoc() {
     loading.value = true;
 
-    // ปิด dialog หลังจาก set loading เพื่อให้แสดง loading overlay
-    setTimeout(() => {
-        showSummaryDialog.value = false;
-    }, 100);
-
     try {
         // เตรียมข้อมูลสำหรับ API
         const details = scannedItems.value.map((item) => ({
@@ -519,7 +519,11 @@ async function saveReceiveDoc() {
             qty: item.qty.toString()
         }));
 
-        const result = await ReceiveDocService.updateReceiveDoc(docno.value, details);
+        // บังคับแสดง loading อย่างน้อย 2 วินาที
+        const [result] = await Promise.all([
+            ReceiveDocService.updateReceiveDoc(docno.value, details),
+            new Promise(resolve => setTimeout(resolve, 1000))
+        ]);
 
         if (result.success) {
             toast.add({
@@ -529,13 +533,10 @@ async function saveReceiveDoc() {
                 life: 3000
             });
 
-            // กลับไปหน้ารายการใบรับ
-            setTimeout(() => {
-                router.push({ name: 'receivedoc' });
-            }, 1500);
+            // กลับไปหน้ารายการใบรับทันที
+            router.push({ name: 'receivedoc' });
         } else {
             loading.value = false;
-            showSummaryDialog.value = true;
             toast.add({
                 severity: 'error',
                 summary: 'Error',
@@ -545,7 +546,6 @@ async function saveReceiveDoc() {
         }
     } catch (error) {
         loading.value = false;
-        showSummaryDialog.value = true;
         toast.add({
             severity: 'error',
             summary: 'Error',
@@ -746,6 +746,7 @@ onUnmounted(() => {
                             <div class="flex items-center gap-3">
                                 <div class="font-bold text-base text-primary">{{ so.item_code }}</div>
                                 <Tag :value="so.unit_code" severity="secondary" class="text-xs" />
+                                <Tag v-if="so.item_year" :value="`ปี ${so.item_year}`" severity="warning" class="text-xs" />
                             </div>
                             <div class="text-sm text-muted-color truncate mt-1">{{ so.item_name || '-' }}</div>
                         </div>
@@ -786,7 +787,10 @@ onUnmounted(() => {
                         <!-- Item Header -->
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex-1 min-w-0">
-                                <div class="font-bold text-lg text-primary mb-1">{{ so.item_code }}</div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <div class="font-bold text-lg text-primary">{{ so.item_code }}</div>
+                                    <Tag v-if="so.item_year" :value="`ปี ${so.item_year}`" severity="warning" class="text-sm" />
+                                </div>
                                 <div class="text-sm text-muted-color truncate">{{ so.item_name || '-' }}</div>
                             </div>
                             <Tag :value="so.unit_code" severity="secondary" class="ml-2" />
@@ -833,6 +837,14 @@ onUnmounted(() => {
 
         <!-- Summary Dialog -->
         <Dialog v-model:visible="showSummaryDialog" :header="docno" :style="isMobile ? { width: '95vw', maxWidth: '500px' } : { width: '90vw', maxWidth: '1000px' }" :modal="true" :closable="!loading" :draggable="false">
+            <BlockUI :blocked="loading" class="min-h-[200px]">
+                <div v-if="loading" class="absolute inset-0 flex items-center justify-center bg-surface-0/80 dark:bg-surface-900/80 z-10">
+                    <div class="text-center">
+                        <i class="pi pi-spin pi-spinner text-4xl text-primary mb-3"></i>
+                        <div class="font-semibold text-lg">กำลังบันทึกข้อมูล...</div>
+                        <div class="text-sm text-muted-color">กรุณารอสักครู่</div>
+                    </div>
+                </div>
             <div class="space-y-2 lg:space-y-2">
                 <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 lg:p-3 border border-surface-200 dark:border-surface-700">
                     <!-- Desktop: Horizontal Layout -->
@@ -844,6 +856,7 @@ onUnmounted(() => {
                                 <div class="flex items-center gap-3 mb-1">
                                     <div class="font-semibold text-lg text-primary">{{ item.item_code }}</div>
                                     <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                                    <Tag v-if="item.item_year_so" :value="`ปี ${item.item_year_so}`" severity="warning" class="text-sm" />
                                 </div>
                                 <div class="text-base text-muted-color truncate">{{ item.item_name }}</div>
                             </div>
@@ -874,7 +887,10 @@ onUnmounted(() => {
                     <div class="lg:hidden">
                         <!-- Item Header -->
                         <div class="flex items-center justify-between mb-2">
-                            <div class="font-semibold text-base text-primary">{{ item.item_code }}</div>
+                            <div class="flex items-center gap-2">
+                                <div class="font-semibold text-base text-primary">{{ item.item_code }}</div>
+                                <Tag v-if="item.item_year_so" :value="`ปี ${item.item_year_so}`" severity="warning" class="text-sm" />
+                            </div>
                             <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
                         </div>
                         <div class="text-sm text-muted-color mb-2 truncate">{{ item.item_name }}</div>
@@ -899,21 +915,13 @@ onUnmounted(() => {
                     </div>
                 </div>
             </div>
+            </BlockUI>
 
             <template #footer>
                 <Button label="ยกเลิก" icon="pi pi-times" text @click="showSummaryDialog = false" size="small" :disabled="loading" />
                 <Button label="ยืนยันบันทึก" icon="pi pi-check" severity="success" @click="saveReceiveDoc" size="small" :loading="loading" />
             </template>
         </Dialog>
-
-        <!-- Full Screen Loading Overlay -->
-        <div v-if="loading && !showSummaryDialog" class="fixed inset-0 bg-surface-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div class="bg-surface-0 dark:bg-surface-200 rounded-lg p-6 shadow-2xl text-center">
-                <i class="pi pi-spin pi-spinner text-4xl text-primary mb-3"></i>
-                <div class="font-semibold text-lg mb-2">กำลังบันทึกข้อมูล...</div>
-                <div class="text-sm text-muted-color">กรุณารอสักครู่</div>
-            </div>
-        </div>
     </div>
 </template>
 
