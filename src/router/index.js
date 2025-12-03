@@ -117,7 +117,7 @@ const router = createRouter({
                 {
                     path: '/pages/permissions',
                     name: 'permissions',
-                    meta: { requiresSuperAdmin: true },
+                    meta: { requiresAuth: true, requiresAdminPermission: true },
                     component: () => import('@/views/pages/Permissions.vue')
                 },
                 {
@@ -141,7 +141,7 @@ const router = createRouter({
                 {
                     path: '/pages/receivehistory',
                     name: 'receivehistory',
-                    meta: { requiresAuth: true, requiresReceivePermission: true },
+                    meta: { requiresAuth: true, requiresHistoryPermission: true },
                     component: () => import('@/views/pages/ReceiveHistory.vue')
                 }
             ]
@@ -179,21 +179,25 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
     const isAuthenticated = AuthService.isAuthenticated();
     const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
-    const requiresSuperAdmin = to.matched.some(record => record.meta.requiresSuperAdmin);
     const requiresReceivePermission = to.matched.some(record => record.meta.requiresReceivePermission);
+    const requiresHistoryPermission = to.matched.some(record => record.meta.requiresHistoryPermission);
+    const requiresAdminPermission = to.matched.some(record => record.meta.requiresAdminPermission);
 
     // ตรวจสอบ authentication
     if (requiresAuth && !isAuthenticated) {
         // ถ้าหน้านั้นต้อง login แต่ยังไม่ได้ login ให้ redirect ไปหน้า login
         next({ name: 'login' });
     } else if (to.name === 'login' && isAuthenticated) {
-        // ถ้า login แล้วแต่พยายามเข้าหน้า login อีก ให้ redirect ไป receivedoc
-        next({ name: 'receivedoc' });
-    } else if (requiresSuperAdmin && !AuthService.isSuperAdmin()) {
-        // ถ้าหน้านั้นต้อง SUPERADMIN แต่ไม่ใช่ SUPERADMIN ให้ redirect ไปหน้า access denied
-        next({ name: 'accessDenied' });
+        // ถ้า login แล้วแต่พยายามเข้าหน้า login อีก ให้ redirect ไปหน้าแรก
+        next({ path: '/' });
     } else if (requiresReceivePermission && !AuthService.hasPermission('receive_screen')) {
         // ถ้าหน้านั้นต้องสิทธิ์ receive_screen แต่ไม่มีสิทธิ์
+        next({ name: 'accessDenied' });
+    } else if (requiresHistoryPermission && !AuthService.hasPermission('history_screen')) {
+        // ถ้าหน้านั้นต้องสิทธิ์ history_screen แต่ไม่มีสิทธิ์
+        next({ name: 'accessDenied' });
+    } else if (requiresAdminPermission && !AuthService.isSuperAdmin() && !AuthService.hasPermission('admin_screen')) {
+        // ถ้าหน้านั้นต้องสิทธิ์ admin (SUPERADMIN หรือ admin_screen) แต่ไม่มีสิทธิ์
         next({ name: 'accessDenied' });
     } else {
         // ปกติให้ผ่าน

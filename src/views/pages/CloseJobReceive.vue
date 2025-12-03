@@ -190,7 +190,6 @@ function closeDetailDialog() {
                         <Button label="ค้นหา" icon="pi pi-search" @click="handleSearch" :loading="loading" fluid />
                         <Button label="รีเฟรช" icon="pi pi-refresh" severity="secondary" @click="loadReceiveDocs" :loading="loading" fluid />
                     </div>
-                    <Button label="สร้างใบรับ" icon="pi pi-plus" @click="openCreateDialog" fluid severity="success" />
                 </div>
             </div>
 

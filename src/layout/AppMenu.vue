@@ -27,10 +27,12 @@ const model = computed(() => {
     });
 
     // เมนูหลักสำหรับ Production
-    if (permissions.value && permissions.value.receive_screen === '1') {
-        menu.push({
-            label: 'เมนูหลัก',
-            items: [
+    if (permissions.value) {
+        const mainMenuItems = [];
+
+        // เมนูรับสินค้า
+        if (permissions.value.receive_screen === '1') {
+            mainMenuItems.push(
                 {
                     label: 'รับสินค้าจาก SO',
                     icon: 'pi pi-fw pi-file-check',
@@ -40,18 +42,30 @@ const model = computed(() => {
                     label: 'รายการรับสินค้า',
                     icon: 'pi pi-fw pi-check-circle',
                     to: '/pages/closejobreceive'
-                },
-                {
-                    label: 'ประวัติ',
-                    icon: 'pi pi-fw pi-history',
-                    to: '/pages/receivehistory'
                 }
-            ]
-        });
+            );
+        }
+
+        // เมนูประวัติ
+        if (permissions.value.history_screen === '1') {
+            mainMenuItems.push({
+                label: 'ประวัติ',
+                icon: 'pi pi-fw pi-history',
+                to: '/pages/receivehistory'
+            });
+        }
+
+        // เพิ่มเมนูหลักถ้ามีรายการ
+        if (mainMenuItems.length > 0) {
+            menu.push({
+                label: 'เมนูหลัก',
+                items: mainMenuItems
+            });
+        }
     }
 
-    // เพิ่มเมนู "กำหนดสิทธิ์" เฉพาะ SUPERADMIN
-    if (isSuperAdmin.value) {
+    // เพิ่มเมนู "กำหนดสิทธิ์" สำหรับ SUPERADMIN หรือ admin_screen = '1'
+    if (isSuperAdmin.value || (permissions.value && permissions.value.admin_screen === '1')) {
         menu.push({
             label: 'Admin',
             items: [

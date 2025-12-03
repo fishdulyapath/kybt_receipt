@@ -589,11 +589,10 @@ onUnmounted(() => {
             <!-- Progress Section -->
             <div class="px-3 py-2 md:px-4 md:py-3 bg-surface-50 dark:bg-surface-900">
                 <div class="flex items-center justify-between mb-1.5 md:mb-2">
-                    <span class="text-sm md:text-base font-semibold">ความคืบหน้า</span>
+                    <span class="text-sm md:text-base font-semibold" :class="progressPercentage === 100 ? 'text-success' : 'text-primary'">ความคืบหน้า {{ progressPercentage.toFixed(1) }}%</span>
                     <span class="text-xs md:text-sm text-muted-color">{{ totalScannedQty }} / {{ totalSOQty }} ชิ้น</span>
                 </div>
-                <ProgressBar :value="progressPercentage" :showValue="false" class="h-2 md:h-3 mb-1 md:mb-2" />
-                <div class="text-xs md:text-sm text-center font-semibold" :class="progressPercentage === 100 ? 'text-success' : 'text-primary'">{{ progressPercentage.toFixed(1) }}%</div>
+                <ProgressBar :value="progressPercentage" :showValue="false" class="h-2 md:h-3" />
             </div>
 
             <!-- Input Mode Selection -->
@@ -662,12 +661,12 @@ onUnmounted(() => {
                     <!-- Item Header -->
                     <div class="flex items-start p-3 pb-2">
                         <div class="flex-1 min-w-0">
-                            <div class="font-semibold text-primary text-sm truncate mb-1">{{ item.item_code }}</div>
-                            <div class="text-xs text-muted-color truncate mb-1">{{ item.item_name || '-' }}</div>
+                            <div class="font-semibold text-primary text-base md:text-lg truncate mb-1">{{ item.item_code }}</div>
+                            <div class="text-sm md:text-base text-muted-color truncate mb-1">{{ item.item_name || '-' }}</div>
                             <div class="flex items-center gap-2">
-                                <i class="pi pi-qrcode text-xs text-muted-color"></i>
-                                <span class="font-mono font-bold text-xs text-primary bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded">{{ item.barcode }}</span>
-                                <span v-if="item.item_year" class="text-xs font-semibold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">#{{ item.item_year }}</span>
+                                <i class="pi pi-qrcode text-sm md:text-base text-muted-color"></i>
+                                <span class="font-mono font-bold text-sm md:text-base text-primary bg-primary-50 dark:bg-primary-900/20 px-2 py-1 rounded">{{ item.barcode }}</span>
+                                <span v-if="item.item_year" class="text-sm md:text-base font-semibold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">ปี {{ item.item_year }}</span>
                             </div>
                         </div>
                         <Button icon="pi pi-trash" severity="danger" text rounded size="small" @click="removeScannedItem(index)" class="ml-2 -mt-1" />
@@ -676,13 +675,13 @@ onUnmounted(() => {
                     <!-- Quantity Controls -->
                     <div class="flex items-center justify-between px-3 pb-3 pt-1">
                         <div class="flex items-center gap-1">
-                            <Tag :value="item.unit_code" severity="secondary" class="text-xs" />
+                            <Tag :value="item.unit_code" severity="secondary" class="text-sm md:text-base" />
                         </div>
                         <div class="flex items-center gap-2">
                             <Button icon="pi pi-minus" text rounded size="small" severity="secondary" @click="item.qty > 1 && updateQty(index, item.qty - 1)" :disabled="item.qty <= 1" />
-                            <div class="bg-primary-50 dark:bg-primary-900/20 rounded px-3 py-1 min-w-[3.5rem] text-center">
-                                <div class="text-xl font-bold text-primary leading-none">{{ item.qty }}</div>
-                                <div class="text-[10px] text-muted-color">/ {{ item.max_qty }}</div>
+                            <div class="bg-primary-50 dark:bg-primary-900/20 rounded px-3 py-1 min-w-[3.5rem] md:min-w-[4rem] text-center">
+                                <div class="text-xl md:text-2xl font-bold text-primary leading-none">{{ item.qty }}</div>
+                                <div class="text-xs md:text-sm text-muted-color">/ {{ item.max_qty }}</div>
                             </div>
                             <Button icon="pi pi-plus" text rounded size="small" severity="success" @click="updateQty(index, item.qty + 1)" :disabled="item.qty >= item.max_qty" />
                         </div>
@@ -699,81 +698,130 @@ onUnmounted(() => {
             <div class="h-20"></div>
         </div>
 
-        <!-- SO Details Dialog - Full Screen -->
-        <Dialog v-model:visible="showSODetails" header="รายการใน SO" :style="{ width: '100vw', height: '100vh', maxWidth: '100%' }" :modal="true" :dismissableMask="true" :draggable="false" class="so-details-dialog">
+        <!-- SO Details Dialog - Full Screen on Mobile, Compact on Desktop -->
+        <Dialog
+            v-model:visible="showSODetails"
+            header="รายการใน SO"
+            :style="isMobile ? { width: '100vw', height: '100vh', maxWidth: '100%' } : { width: '90vw', maxWidth: '1200px' }"
+            :modal="true"
+            :dismissableMask="true"
+            :draggable="false"
+            class="so-details-dialog"
+        >
             <template #header>
                 <div class="flex items-center justify-between w-full pr-8">
                     <div class="flex items-center gap-3">
                         <i class="pi pi-list text-xl"></i>
                         <div>
-                            <div class="font-bold text-lg">รายการใน SO</div>
-                            <div class="text-xs text-muted-color">{{ docno }}</div>
+                            <div class="font-bold text-lg">SO: {{ docno }}</div>
                         </div>
                     </div>
                     <Tag :value="`${soDetails.length} รายการ`" severity="info" />
                 </div>
             </template>
 
-            <!-- Stats Summary -->
-            <div class="grid grid-cols-3 gap-2 md:gap-3 mb-3 md:mb-4">
-                <div class="bg-primary-100 dark:bg-primary-900/30 rounded-lg p-2 md:p-3 text-center">
-                    <div class="text-[10px] md:text-xs text-primary-600 dark:text-primary-400 mb-1">รายการทั้งหมด</div>
-                    <div class="text-lg md:text-2xl font-bold text-primary">{{ soDetails.length }}</div>
+            <!-- Stats Summary - Horizontal on Desktop -->
+            <div class="grid grid-cols-3 gap-2 lg:gap-4 mb-3 lg:mb-4">
+                <div class="bg-primary-100 dark:bg-primary-900/30 rounded-lg p-2 lg:p-4 text-center">
+                    <div class="text-[10px] lg:text-sm text-primary-600 dark:text-primary-400 mb-1">รายการทั้งหมด</div>
+                    <div class="text-lg lg:text-3xl font-bold text-primary">{{ soDetails.length }}</div>
                 </div>
-                <div class="bg-success-100 dark:bg-success-900/30 rounded-lg p-2 md:p-3 text-center">
-                    <div class="text-[10px] md:text-xs text-success-600 dark:text-success-400 mb-1">ยอดรวม SO</div>
-                    <div class="text-lg md:text-2xl font-bold text-success">{{ totalSOQty }}</div>
+                <div class="bg-success-100 dark:bg-success-900/30 rounded-lg p-2 lg:p-4 text-center">
+                    <div class="text-[10px] lg:text-sm text-success-600 dark:text-success-400 mb-1">ยอดรวม SO</div>
+                    <div class="text-lg lg:text-3xl font-bold text-success">{{ totalSOQty }}</div>
                 </div>
-                <div class="bg-orange-100 dark:bg-orange-900/30 rounded-lg p-2 md:p-3 text-center">
-                    <div class="text-[10px] md:text-xs text-orange-600 dark:text-orange-400 mb-1">รับแล้ว</div>
-                    <div class="text-lg md:text-2xl font-bold text-orange-600 dark:text-orange-400">{{ totalScannedQty }}</div>
+                <div class="bg-orange-100 dark:bg-orange-900/30 rounded-lg p-2 lg:p-4 text-center">
+                    <div class="text-[10px] lg:text-sm text-orange-600 dark:text-orange-400 mb-1">รับแล้ว</div>
+                    <div class="text-lg lg:text-3xl font-bold text-orange-600 dark:text-orange-400">{{ totalScannedQty }}</div>
                 </div>
             </div>
 
             <!-- SO Items List -->
-            <div class="space-y-2 md:space-y-3">
-                <div v-for="(so, idx) in soDetails" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 p-3 md:p-4">
-                    <!-- Item Header -->
-                    <div class="flex items-start justify-between mb-3">
+            <div class="space-y-2 lg:space-y-2">
+                <div v-for="(so, idx) in soDetails" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded-lg border border-surface-200 dark:border-surface-700 p-3 lg:p-3">
+                    <!-- Desktop: Horizontal Layout -->
+                    <div class="hidden lg:flex lg:items-center lg:gap-4">
+                        <!-- Item Info (Left) -->
                         <div class="flex-1 min-w-0">
-                            <div class="font-bold text-lg text-primary mb-1">{{ so.item_code }}</div>
-                            <div class="text-sm text-muted-color truncate">{{ so.item_name || '-' }}</div>
+                            <div class="flex items-center gap-3">
+                                <div class="font-bold text-base text-primary">{{ so.item_code }}</div>
+                                <Tag :value="so.unit_code" severity="secondary" class="text-xs" />
+                            </div>
+                            <div class="text-sm text-muted-color truncate mt-1">{{ so.item_name || '-' }}</div>
                         </div>
-                        <Tag :value="so.unit_code" severity="secondary" class="ml-2" />
-                    </div>
 
-                    <!-- Quantity Stats -->
-                    <div class="grid grid-cols-3 gap-2 md:gap-3">
-                        <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 md:p-3 text-center">
-                            <div class="text-[10px] md:text-xs text-blue-600 dark:text-blue-400 mb-1">จำนวน SO</div>
-                            <div class="text-base md:text-xl font-bold text-blue-600 dark:text-blue-400">{{ so.qty }}</div>
-                        </div>
-                        <div :class="['rounded-lg p-2 md:p-3 text-center', getScannedQty(so.item_code) >= parseInt(so.qty) ? 'bg-green-50 dark:bg-green-900/20' : 'bg-orange-50 dark:bg-orange-900/20']">
-                            <div class="text-[10px] md:text-xs mb-1" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">รับแล้ว</div>
-                            <div class="text-base md:text-xl font-bold" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">
-                                {{ getScannedQty(so.item_code) }}
+                        <!-- Quantity Stats (Center) - Inline -->
+                        <div class="flex items-center gap-4">
+                            <div class="text-center">
+                                <div class="text-xs text-blue-600 dark:text-blue-400 mb-1">จำนวน SO</div>
+                                <div class="text-xl font-bold text-blue-600 dark:text-blue-400">{{ so.qty }}</div>
+                            </div>
+                            <div class="text-muted-color">→</div>
+                            <div class="text-center">
+                                <div class="text-xs mb-1" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">รับแล้ว</div>
+                                <div class="text-xl font-bold" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">
+                                    {{ getScannedQty(so.item_code) }}
+                                </div>
+                            </div>
+                            <div class="text-muted-color">→</div>
+                            <div class="text-center">
+                                <div class="text-xs text-muted-color mb-1">คงเหลือ</div>
+                                <div class="text-xl font-bold">{{ getRemainingQty(so.item_code) }}</div>
                             </div>
                         </div>
-                        <div class="bg-surface-100 dark:bg-surface-700 rounded-lg p-2 md:p-3 text-center">
-                            <div class="text-[10px] md:text-xs text-muted-color mb-1">คงเหลือ</div>
-                            <div class="text-base md:text-xl font-bold">{{ getRemainingQty(so.item_code) }}</div>
+
+                        <!-- Progress & Status (Right) -->
+                        <div class="flex items-center gap-3">
+                            <div class="w-32">
+                                <Tag v-if="getScannedQty(so.item_code) >= parseInt(so.qty)" value="ครบ" severity="success" icon="pi pi-check-circle" class="text-xs" />
+                                <Tag v-else-if="getScannedQty(so.item_code) > 0" value="บางส่วน" severity="warn" icon="pi pi-clock" class="text-xs" />
+                                <Tag v-else value="ยังไม่รับ" severity="danger" icon="pi pi-times-circle" class="text-xs" />
+                                <div class="text-xs text-center mt-1 font-semibold">{{ ((getScannedQty(so.item_code) / parseInt(so.qty)) * 100).toFixed(0) }}%</div>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Progress Bar -->
-                    <div class="mt-3">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs text-muted-color">ความคืบหน้า</span>
-                            <span class="text-xs font-semibold">{{ ((getScannedQty(so.item_code) / parseInt(so.qty)) * 100).toFixed(0) }}%</span>
+                    <!-- Mobile: Vertical Layout (Original) -->
+                    <div class="lg:hidden">
+                        <!-- Item Header -->
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1 min-w-0">
+                                <div class="font-bold text-lg text-primary mb-1">{{ so.item_code }}</div>
+                                <div class="text-sm text-muted-color truncate">{{ so.item_name || '-' }}</div>
+                            </div>
+                            <Tag :value="so.unit_code" severity="secondary" class="ml-2" />
                         </div>
-                        <ProgressBar :value="(getScannedQty(so.item_code) / parseInt(so.qty)) * 100" :showValue="false" class="h-2" />
-                    </div>
 
-                    <!-- Status Badge -->
-                    <div class="mt-3 flex justify-end">
-                        <Tag v-if="getScannedQty(so.item_code) >= parseInt(so.qty)" value="รับครบแล้ว" severity="success" icon="pi pi-check-circle" />
-                        <Tag v-else-if="getScannedQty(so.item_code) > 0" value="รับบางส่วน" severity="warn" icon="pi pi-clock" />
-                        <Tag v-else value="ยังไม่รับ" severity="danger" icon="pi pi-times-circle" />
+                        <!-- Quantity Stats -->
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-2 text-center">
+                                <div class="text-[10px] text-blue-600 dark:text-blue-400 mb-1">จำนวน SO</div>
+                                <div class="text-base font-bold text-blue-600 dark:text-blue-400">{{ so.qty }}</div>
+                            </div>
+                            <div :class="['rounded-lg p-2 text-center', getScannedQty(so.item_code) >= parseInt(so.qty) ? 'bg-green-50 dark:bg-green-900/20' : 'bg-orange-50 dark:bg-orange-900/20']">
+                                <div class="text-[10px] mb-1" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">รับแล้ว</div>
+                                <div class="text-base font-bold" :class="getScannedQty(so.item_code) >= parseInt(so.qty) ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'">
+                                    {{ getScannedQty(so.item_code) }}
+                                </div>
+                            </div>
+                            <div class="bg-surface-100 dark:bg-surface-700 rounded-lg p-2 text-center">
+                                <div class="text-[10px] text-muted-color mb-1">คงเหลือ</div>
+                                <div class="text-base font-bold">{{ getRemainingQty(so.item_code) }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="mt-3">
+                            <div class="flex items-center justify-between mb-1">
+                                <Tag v-if="getScannedQty(so.item_code) >= parseInt(so.qty)" value="รับครบแล้ว" severity="success" icon="pi pi-check-circle" />
+                                <Tag v-else-if="getScannedQty(so.item_code) > 0" value="รับบางส่วน" severity="warn" icon="pi pi-clock" />
+                                <Tag v-else value="ยังไม่รับ" severity="danger" icon="pi pi-times-circle" />
+                                <span class="text-xs font-semibold">{{ ((getScannedQty(so.item_code) / parseInt(so.qty)) * 100).toFixed(0) }}%</span>
+                            </div>
+                            <ProgressBar :value="(getScannedQty(so.item_code) / parseInt(so.qty)) * 100" :showValue="false" class="h-2" />
+                        </div>
+
+                       
                     </div>
                 </div>
             </div>
@@ -784,37 +832,69 @@ onUnmounted(() => {
         </Dialog>
 
         <!-- Summary Dialog -->
-        <Dialog v-model:visible="showSummaryDialog" header="สรุปการรับสินค้า" :style="{ width: '95vw', maxWidth: '500px' }" :modal="true" :closable="!loading">
-            <div class="mb-3 text-xs">
-                <span class="text-muted-color">เอกสาร:</span>
-                <span class="font-semibold text-primary ml-1">{{ docno }}</span>
-            </div>
-
-            <div class="space-y-3">
-                <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 border border-surface-200 dark:border-surface-700">
-                    <!-- Item Header -->
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="font-semibold text-sm text-primary">{{ item.item_code }}</div>
-                        <Tag :value="item.unit_code" severity="secondary" class="text-xs" />
-                    </div>
-                    <div class="text-xs text-muted-color mb-2 truncate">{{ item.item_name }}</div>
-
-                    <!-- Total Quantity -->
-                    <div class="flex items-center justify-between mb-2 pb-2 border-b border-surface-200 dark:border-surface-700">
-                        <span class="text-xs font-semibold text-muted-color">จำนวนรวม:</span>
-                        <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-xs" />
-                    </div>
-
-                    <!-- Barcode Details -->
-                    <div class="space-y-1.5">
-                        <div class="text-[10px] font-semibold text-muted-color mb-1">รายละเอียด Barcode:</div>
-                        <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="bg-surface-0 dark:bg-surface-900 rounded p-2 flex items-center justify-between">
-                            <div class="flex items-center gap-2 flex-1 min-w-0">
-                                <i class="pi pi-qrcode text-xs text-primary"></i>
-                                <span class="font-mono font-semibold text-xs text-primary truncate">{{ detail.barcode }}</span>
-                                <span v-if="detail.item_year" class="text-xs font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded">#{{ detail.item_year }}</span>
+        <Dialog v-model:visible="showSummaryDialog" :header="docno" :style="isMobile ? { width: '95vw', maxWidth: '500px' } : { width: '90vw', maxWidth: '1000px' }" :modal="true" :closable="!loading" :draggable="false">
+            <div class="space-y-2 lg:space-y-2">
+                <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 lg:p-3 border border-surface-200 dark:border-surface-700">
+                    <!-- Desktop: Horizontal Layout -->
+                    <div class="hidden lg:block">
+                        <!-- Main Info Row -->
+                        <div class="flex items-center gap-4 mb-3">
+                            <!-- Item Info (Left) -->
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-3 mb-1">
+                                    <div class="font-semibold text-lg text-primary">{{ item.item_code }}</div>
+                                    <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                                </div>
+                                <div class="text-base text-muted-color truncate">{{ item.item_name }}</div>
                             </div>
-                            <Tag :value="`x${detail.qty}`" severity="info" class="text-xs ml-2" />
+
+                            <!-- Quantity Summary (Right) -->
+                            <div class="flex items-center gap-3">
+                                <div class="text-center">
+                                    <div class="text-sm text-muted-color mb-1">จำนวนรวม</div>
+                                    <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-base" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Barcode Details Row (Below) -->
+                        <div class="border-t border-surface-200 dark:border-surface-700 pt-3">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="flex items-center gap-2 bg-surface-0 dark:bg-surface-900 rounded px-3 py-2 border border-surface-200 dark:border-surface-600">
+                                    <i class="pi pi-qrcode text-sm text-primary"></i>
+                                    <span class="font-mono font-semibold text-sm text-primary">{{ detail.barcode }}</span>
+                                    <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
+                                    <Tag :value="`x${detail.qty}`" severity="info" class="text-sm" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mobile: Vertical Layout (Original) -->
+                    <div class="lg:hidden">
+                        <!-- Item Header -->
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="font-semibold text-base text-primary">{{ item.item_code }}</div>
+                            <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                        </div>
+                        <div class="text-sm text-muted-color mb-2 truncate">{{ item.item_name }}</div>
+
+                        <!-- Total Quantity -->
+                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-surface-200 dark:border-surface-700">
+                            <span class="text-sm font-semibold text-muted-color">จำนวนรวม:</span>
+                            <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-sm" />
+                        </div>
+
+                        <!-- Barcode Details -->
+                        <div class="space-y-2">
+                            <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="bg-surface-0 dark:bg-surface-900 rounded p-2.5 flex items-center justify-between">
+                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                    <i class="pi pi-qrcode text-sm text-primary"></i>
+                                    <span class="font-mono font-semibold text-sm text-primary truncate">{{ detail.barcode }}</span>
+                                    <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
+                                </div>
+                                <Tag :value="`x${detail.qty}`" severity="info" class="text-sm ml-2" />
+                            </div>
                         </div>
                     </div>
                 </div>

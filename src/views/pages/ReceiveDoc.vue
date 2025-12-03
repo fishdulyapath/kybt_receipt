@@ -478,7 +478,7 @@ function closeDetailDialog() {
                         <div
                             v-for="so in soList"
                             :key="so.doc_no"
-                            @click="selectSO({ data: so })"
+                            @click.stop="selectSO({ data: so })"
                             class="bg-surface-0 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-lg p-3 cursor-pointer hover:border-primary transition-colors"
                         >
                             <div class="flex items-start justify-between mb-2">
@@ -549,7 +549,7 @@ function closeDetailDialog() {
 
                         <Column header="จัดการ" :exportable="false" style="min-width: 10rem">
                             <template #body="slotProps">
-                                <Button icon="pi pi-check" label="เลือก" size="small" severity="success" @click="selectSO({ data: slotProps.data })" />
+                                <Button icon="pi pi-check" label="เลือก" size="small" severity="success" @click.stop="selectSO({ data: slotProps.data })" />
                             </template>
                         </Column>
                     </DataTable>

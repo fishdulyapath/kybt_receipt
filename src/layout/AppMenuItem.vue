@@ -64,7 +64,16 @@ function itemClick(event, item) {
 }
 
 function checkActiveRoute(item) {
-    return route.path === item.to;
+    // Check exact match or if current path starts with menu item path
+    // This ensures sub-routes (like /pages/receiveitem/:docno) stay active when parent is /pages/receivedoc
+    if (route.path === item.to) return true;
+    
+    // Special case: /pages/receivedoc should also be active for /pages/receiveitem/*
+    if (item.to === '/pages/receivedoc' && route.path.startsWith('/pages/receiveitem')) {
+        return true;
+    }
+    
+    return false;
 }
 </script>
 
