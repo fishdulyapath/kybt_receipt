@@ -10,7 +10,7 @@ class ReceiveDocService {
             const provider = AuthService.getProviderName();
             const dbname = AuthService.getDatabaseName();
 
-            const response = await axios.get(`${API_URL}/getReceiveDocList`, {
+            const response = await axios.get(`${API_URL}getReceiveDocList`, {
                 params: {
                     provider,
                     dbname,
@@ -43,7 +43,7 @@ class ReceiveDocService {
             const provider = AuthService.getProviderName();
             const dbname = AuthService.getDatabaseName();
 
-            const response = await axios.get(`${API_URL}/getReceiveDocList`, {
+            const response = await axios.get(`${API_URL}getReceiveDocList`, {
                 params: {
                     provider,
                     dbname,

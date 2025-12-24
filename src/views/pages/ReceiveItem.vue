@@ -1,7 +1,8 @@
 <script setup>
 import ReceiveDocService from '@/service/ReceiveDocService';
+import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, onUnmounted } from 'vue';
+import { computed, onMounted, ref, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
@@ -23,6 +24,7 @@ const searchResults = ref([]);
 
 // Barcode Scanning
 const barcodeInput = ref('');
+const barcodeInputRef = ref(null);
 
 // Input Mode Selection
 const inputMode = ref('barcode'); // 'barcode' or 'search'
@@ -36,6 +38,10 @@ const scannedItems = ref([]);
 
 // Summary Dialog
 const showSummaryDialog = ref(false);
+
+// Print Dialog
+const showPrintDialog = ref(false);
+const documentData = ref({});
 
 // SO Details toggle
 const showSODetails = ref(false);
@@ -118,6 +124,20 @@ function getScannedQty(itemCode) {
 // คำนวณจำนวนคงเหลือที่ยังรับได้
 function getRemainingQty(itemCode) {
     return getMaxQty(itemCode) - getScannedQty(itemCode);
+}
+
+// ฟังก์ชันสำหรับ re-focus barcode input หลัง scan
+function refocusBarcodeInput() {
+    if (inputMode.value === 'barcode') {
+        nextTick(() => {
+            if (barcodeInputRef.value && barcodeInputRef.value.$el) {
+                const inputElement = barcodeInputRef.value.$el;
+                if (inputElement && typeof inputElement.focus === 'function') {
+                    inputElement.focus();
+                }
+            }
+        });
+    }
 }
 
 // แยก Barcode Input รูปแบบ 10*04-101-0000539#2024
@@ -270,6 +290,8 @@ async function processBarcodeInput() {
     } finally {
         searchLoading.value = false;
         barcodeInput.value = '';
+        // Re-focus input field เพื่อให้สามารถ scan ต่อได้ทันที
+        refocusBarcodeInput();
     }
 }
 
@@ -467,7 +489,7 @@ const summaryItems = computed(() => {
             // หาข้อมูล item_year จาก SO
             const soItem = soDetails.value.find((so) => so.item_code === item.item_code);
             const soItemYear = soItem?.item_year || '';
-            
+
             grouped[item.item_code] = {
                 item_code: item.item_code,
                 item_name: item.item_name,
@@ -520,10 +542,7 @@ async function saveReceiveDoc() {
         }));
 
         // บังคับแสดง loading อย่างน้อย 2 วินาที
-        const [result] = await Promise.all([
-            ReceiveDocService.updateReceiveDoc(docno.value, details),
-            new Promise(resolve => setTimeout(resolve, 1000))
-        ]);
+        const [result] = await Promise.all([ReceiveDocService.updateReceiveDoc(docno.value, details), new Promise((resolve) => setTimeout(resolve, 1000))]);
 
         if (result.success) {
             toast.add({
@@ -533,8 +552,19 @@ async function saveReceiveDoc() {
                 life: 3000
             });
 
-            // กลับไปหน้ารายการใบรับทันที
-            router.push({ name: 'receivedoc' });
+            // เช็คว่าจำนวนที่รับเท่ากับ SO หรือไม่
+            if (totalScannedQty.value === totalSOQty.value) {
+                // โหลดข้อมูล document อีกครั้งเพื่อเตรียมพิมพ์
+                await loadDocumentDataForPrint();
+                
+                // เปิด Print Dialog
+                showPrintDialog.value = true;
+            } else {
+                // ถ้าจำนวนไม่เท่ากัน ให้กลับไปหน้ารายการทันที
+                router.push({ name: 'receivedoc' });
+            }
+            
+            showSummaryDialog.value = false;
         } else {
             loading.value = false;
             toast.add({
@@ -553,6 +583,42 @@ async function saveReceiveDoc() {
             life: 3000
         });
     }
+}
+
+// โหลดข้อมูล document สำหรับพิมพ์
+async function loadDocumentDataForPrint() {
+    try {
+        // ดึงข้อมูลจาก API getReceiveDocList เพื่อหาข้อมูลเอกสาร
+        const result = await ReceiveDocService.getReceiveDocList(docno.value, '', '', 1, 1);
+        
+        if (result.success && result.data && result.data.length > 0) {
+            documentData.value = result.data[0];
+        } else {
+            // ถ้าหาไม่เจอให้ใช้ข้อมูลพื้นฐาน
+            documentData.value = {
+                doc_no: docno.value,
+                doc_date: new Date().toISOString().split('T')[0],
+                doc_time: new Date().toTimeString().split(' ')[0],
+                cust_name: '-',
+                user_close_name: '-'
+            };
+        }
+    } catch (error) {
+        console.error('Error loading document data:', error);
+        documentData.value = {
+            doc_no: docno.value,
+            doc_date: new Date().toISOString().split('T')[0],
+            doc_time: new Date().toTimeString().split(' ')[0],
+            cust_name: '-',
+            user_close_name: '-'
+        };
+    }
+}
+
+// ปิด Print Dialog และกลับไปหน้ารายการ
+function handlePrintDialogClose() {
+    showPrintDialog.value = false;
+    router.push({ name: 'receivedoc' });
 }
 
 // ยกเลิกและกลับไปหน้ารายการ
@@ -609,7 +675,7 @@ onUnmounted(() => {
             <div v-if="inputMode === 'barcode'" class="px-3 pb-3 md:px-4 md:pb-4">
                 <IconField>
                     <InputIcon class="pi pi-qrcode" />
-                    <InputText v-model="barcodeInput" @keyup.enter="processBarcodeInput" placeholder="Scan Barcode..." fluid class="text-base md:text-lg font-mono" :disabled="searchLoading" autofocus />
+                    <InputText ref="barcodeInputRef" v-model="barcodeInput" @keyup.enter="processBarcodeInput" placeholder="Scan Barcode..." fluid class="text-base md:text-lg font-mono" :disabled="searchLoading" autofocus />
                 </IconField>
             </div>
 
@@ -824,8 +890,6 @@ onUnmounted(() => {
                             </div>
                             <ProgressBar :value="(getScannedQty(so.item_code) / parseInt(so.qty)) * 100" :showValue="false" class="h-2" />
                         </div>
-
-                       
                     </div>
                 </div>
             </div>
@@ -845,76 +909,76 @@ onUnmounted(() => {
                         <div class="text-sm text-muted-color">กรุณารอสักครู่</div>
                     </div>
                 </div>
-            <div class="space-y-2 lg:space-y-2">
-                <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 lg:p-3 border border-surface-200 dark:border-surface-700">
-                    <!-- Desktop: Horizontal Layout -->
-                    <div class="hidden lg:block">
-                        <!-- Main Info Row -->
-                        <div class="flex items-center gap-4 mb-3">
-                            <!-- Item Info (Left) -->
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-3 mb-1">
-                                    <div class="font-semibold text-lg text-primary">{{ item.item_code }}</div>
-                                    <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                <div class="space-y-2 lg:space-y-2">
+                    <div v-for="(item, idx) in summaryItems" :key="idx" class="bg-surface-50 dark:bg-surface-800 rounded p-3 lg:p-3 border border-surface-200 dark:border-surface-700">
+                        <!-- Desktop: Horizontal Layout -->
+                        <div class="hidden lg:block">
+                            <!-- Main Info Row -->
+                            <div class="flex items-center gap-4 mb-3">
+                                <!-- Item Info (Left) -->
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-3 mb-1">
+                                        <div class="font-semibold text-lg text-primary">{{ item.item_code }}</div>
+                                        <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                                        <Tag v-if="item.item_year_so" :value="`ปี ${item.item_year_so}`" severity="warning" class="text-sm" />
+                                    </div>
+                                    <div class="text-base text-muted-color truncate">{{ item.item_name }}</div>
+                                </div>
+
+                                <!-- Quantity Summary (Right) -->
+                                <div class="flex items-center gap-3">
+                                    <div class="text-center">
+                                        <div class="text-sm text-muted-color mb-1">จำนวนรวม</div>
+                                        <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-base" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Barcode Details Row (Below) -->
+                            <div class="border-t border-surface-200 dark:border-surface-700 pt-3">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="flex items-center gap-2 bg-surface-0 dark:bg-surface-900 rounded px-3 py-2 border border-surface-200 dark:border-surface-600">
+                                        <i class="pi pi-qrcode text-sm text-primary"></i>
+                                        <span class="font-mono font-semibold text-sm text-primary">{{ detail.barcode }}</span>
+                                        <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
+                                        <Tag :value="`x${detail.qty}`" severity="info" class="text-sm" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mobile: Vertical Layout (Original) -->
+                        <div class="lg:hidden">
+                            <!-- Item Header -->
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="font-semibold text-base text-primary">{{ item.item_code }}</div>
                                     <Tag v-if="item.item_year_so" :value="`ปี ${item.item_year_so}`" severity="warning" class="text-sm" />
                                 </div>
-                                <div class="text-base text-muted-color truncate">{{ item.item_name }}</div>
+                                <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
+                            </div>
+                            <div class="text-sm text-muted-color mb-2 truncate">{{ item.item_name }}</div>
+
+                            <!-- Total Quantity -->
+                            <div class="flex items-center justify-between mb-2 pb-2 border-b border-surface-200 dark:border-surface-700">
+                                <span class="text-sm font-semibold text-muted-color">จำนวนรวม:</span>
+                                <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-sm" />
                             </div>
 
-                            <!-- Quantity Summary (Right) -->
-                            <div class="flex items-center gap-3">
-                                <div class="text-center">
-                                    <div class="text-sm text-muted-color mb-1">จำนวนรวม</div>
-                                    <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-base" />
+                            <!-- Barcode Details -->
+                            <div class="space-y-2">
+                                <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="bg-surface-0 dark:bg-surface-900 rounded p-2.5 flex items-center justify-between">
+                                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                                        <i class="pi pi-qrcode text-sm text-primary"></i>
+                                        <span class="font-mono font-semibold text-sm text-primary truncate">{{ detail.barcode }}</span>
+                                        <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
+                                    </div>
+                                    <Tag :value="`x${detail.qty}`" severity="info" class="text-sm ml-2" />
                                 </div>
-                            </div>
-                        </div>
-
-                        <!-- Barcode Details Row (Below) -->
-                        <div class="border-t border-surface-200 dark:border-surface-700 pt-3">
-                            <div class="flex items-center gap-2 flex-wrap">
-                                <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="flex items-center gap-2 bg-surface-0 dark:bg-surface-900 rounded px-3 py-2 border border-surface-200 dark:border-surface-600">
-                                    <i class="pi pi-qrcode text-sm text-primary"></i>
-                                    <span class="font-mono font-semibold text-sm text-primary">{{ detail.barcode }}</span>
-                                    <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
-                                    <Tag :value="`x${detail.qty}`" severity="info" class="text-sm" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Mobile: Vertical Layout (Original) -->
-                    <div class="lg:hidden">
-                        <!-- Item Header -->
-                        <div class="flex items-center justify-between mb-2">
-                            <div class="flex items-center gap-2">
-                                <div class="font-semibold text-base text-primary">{{ item.item_code }}</div>
-                                <Tag v-if="item.item_year_so" :value="`ปี ${item.item_year_so}`" severity="warning" class="text-sm" />
-                            </div>
-                            <Tag :value="item.unit_code" severity="secondary" class="text-sm" />
-                        </div>
-                        <div class="text-sm text-muted-color mb-2 truncate">{{ item.item_name }}</div>
-
-                        <!-- Total Quantity -->
-                        <div class="flex items-center justify-between mb-2 pb-2 border-b border-surface-200 dark:border-surface-700">
-                            <span class="text-sm font-semibold text-muted-color">จำนวนรวม:</span>
-                            <Tag :value="`${item.total_qty} / ${item.max_qty}`" :severity="item.total_qty === item.max_qty ? 'success' : 'warning'" class="text-sm" />
-                        </div>
-
-                        <!-- Barcode Details -->
-                        <div class="space-y-2">
-                            <div v-for="(detail, dIdx) in item.details" :key="dIdx" class="bg-surface-0 dark:bg-surface-900 rounded p-2.5 flex items-center justify-between">
-                                <div class="flex items-center gap-2 flex-1 min-w-0">
-                                    <i class="pi pi-qrcode text-sm text-primary"></i>
-                                    <span class="font-mono font-semibold text-sm text-primary truncate">{{ detail.barcode }}</span>
-                                    <span v-if="detail.item_year" class="text-sm font-bold text-orange-600 bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded">ปี {{ detail.item_year }}</span>
-                                </div>
-                                <Tag :value="`x${detail.qty}`" severity="info" class="text-sm ml-2" />
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
             </BlockUI>
 
             <template #footer>
@@ -922,6 +986,14 @@ onUnmounted(() => {
                 <Button label="ยืนยันบันทึก" icon="pi pi-check" severity="success" @click="saveReceiveDoc" size="small" :loading="loading" />
             </template>
         </Dialog>
+
+        <!-- Print Receipt Dialog -->
+        <PrintReceiptDialog 
+            :visible="showPrintDialog" 
+            @update:visible="handlePrintDialogClose"
+            :documentData="documentData"
+            :items="scannedItems"
+        />
     </div>
 </template>
 

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 
-const emit = defineEmits(['page-change', 'receive-item', 'send-approve', 'delete', 'close-job', 'view-detail', 'row-click']);
+const emit = defineEmits(['page-change', 'receive-item', 'send-approve', 'delete', 'close-job', 'view-detail', 'row-click', 'print', 'view-images']);
 
 const dt = ref();
 
@@ -30,6 +30,12 @@ function canApprove(docData) {
     const soQty = parseInt(docData.so_qty) || 0;
     const receiveQty = parseInt(docData.receive_qty) || 0;
     return soQty === receiveQty && docData.can_approve === '1';
+}
+
+function canPrint(docData) {
+    const soQty = parseInt(docData.so_qty) || 0;
+    const receiveQty = parseInt(docData.receive_qty) || 0;
+    return soQty === receiveQty;
 }
 
 const props = defineProps({
@@ -129,15 +135,24 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
                         <Button icon="pi pi-send" label="ส่งอนุมัติ" size="small" severity="info" :disabled="!canApprove(doc)" @click="emit('send-approve', doc)" />
                         <Button icon="pi pi-trash" label="ลบ" size="small" severity="danger" @click="emit('delete', doc)" />
                     </div>
+                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" fluid outlined />
                 </div>
 
                 <div v-if="mode === 'close'" class="flex flex-col gap-2 pt-3 border-t" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', doc)" fluid class="mb-2" />
-                    <Button icon="pi pi-check-circle" label="ปิดงาน" size="small" severity="success" @click="emit('close-job', doc)" fluid />
+                    <div class="grid grid-cols-2 gap-2">
+                        <Button icon="pi pi-check-circle" label="ปิดงาน" size="small" severity="success" @click="emit('close-job', doc)" />
+                        <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
+                    </div>
+                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" fluid outlined />
                 </div>
 
                 <div v-if="mode === 'history'" class="flex flex-col gap-2 pt-3 border-t" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', doc)" fluid />
+                    <div class="grid grid-cols-2 gap-2">
+                        <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" outlined />
+                        <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
+                    </div>
                 </div>
             </div>
 
@@ -242,7 +257,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
 
         <!-- 6. เมนูจัดการ -->
         <!-- Default Mode: ใบรับสินค้า -->
-        <Column v-if="mode === 'default'" header="จัดการ" :exportable="false" style="min-width: 24rem">
+        <Column v-if="mode === 'default'" header="จัดการ" :exportable="false" style="min-width: 28rem">
             <template #body="slotProps">
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />
@@ -257,16 +272,19 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
                         v-tooltip.top="canApprove(slotProps.data) ? 'ส่งอนุมัติ' : 'รอรับสินค้าให้ครบก่อน'"
                     />
                     <Button icon="pi pi-trash" label="ลบ" size="small" severity="danger" @click="emit('delete', slotProps.data)" v-tooltip.top="'ลบใบรับ'" />
+                    <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
                 </div>
             </template>
         </Column>
 
         <!-- Close Mode: ปิดงานใบรับ -->
-        <Column v-if="mode === 'close'" header="จัดการ" :exportable="false" style="min-width: 16rem">
+        <Column v-if="mode === 'close'" header="จัดการ" :exportable="false" style="min-width: 24rem">
             <template #body="slotProps">
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />
                     <Button icon="pi pi-check-circle" label="ปิดงาน" size="small" severity="success" @click="emit('close-job', slotProps.data)" v-tooltip.top="'ปิดงาน'" />
+                    <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', slotProps.data)" outlined v-tooltip.top="'จัดการรูปภาพ'" :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null" badgeClass="p-badge-success" />
+                    <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
                 </div>
             </template>
         </Column>
@@ -279,15 +297,16 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
         </Column>
 
         <!-- History Mode: จัดการ -->
-        <Column v-if="mode === 'history'" header="จัดการ" :exportable="false" style="min-width: 12rem">
+        <Column v-if="mode === 'history'" header="จัดการ" :exportable="false" style="min-width: 20rem">
             <template #body="slotProps">
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />
+                    <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', slotProps.data)" outlined v-tooltip.top="'ดูรูปภาพ'" :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null" badgeClass="p-badge-success" />
+                    <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
                 </div>
             </template>
         </Column>
     </DataTable>
 </template>
 
-<style scoped lang="scss">
-</style>
+<style scoped lang="scss"></style>
