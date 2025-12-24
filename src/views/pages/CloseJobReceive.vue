@@ -2,6 +2,8 @@
 import ReceiveDocService from '@/service/ReceiveDocService';
 import ReceiveDocTable from '@/components/ReceiveDocTable.vue';
 import ReceiveDetailDialog from '@/components/ReceiveDetailDialog.vue';
+import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
+import ImageGalleryDialog from '@/components/ImageGalleryDialog.vue';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
@@ -28,6 +30,15 @@ const detailLoading = ref(false);
 const selectedDoc = ref(null);
 const soDetails = ref([]);
 const receiveDetails = ref([]);
+
+// Print Dialog
+const showPrintDialog = ref(false);
+const printDocumentData = ref({});
+const printItems = ref([]);
+
+// Image Gallery Dialog
+const showImageGallery = ref(false);
+const selectedDocNo = ref('');
 
 onMounted(async () => {
     await loadReceiveDocs();
@@ -167,6 +178,73 @@ function closeDetailDialog() {
     soDetails.value = [];
     receiveDetails.value = [];
 }
+
+// พิมพ์ใบขึ้นยาง
+async function handlePrint(doc) {
+    try {
+        // โหลดข้อมูล document และ items
+        const result = await ReceiveDocService.getReceiveDocDetail(doc.doc_no);
+        
+        if (result.success) {
+            // คำนวณยอดรวมของ SO และ Receive
+            const totalSOQty = (result.details_so || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+            const totalReceiveQty = (result.details_receive || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
+            
+            // เช็คว่าจำนวนที่รับเท่ากับ SO หรือไม่
+            if (totalReceiveQty !== totalSOQty) {
+                toast.add({
+                    severity: 'warn',
+                    summary: 'ไม่สามารถพิมพ์ได้',
+                    detail: 'จำนวนที่รับต้องเท่ากับจำนวน SO เท่านั้น',
+                    life: 3000
+                });
+                return;
+            }
+            
+            // เตรียมข้อมูล document
+            printDocumentData.value = doc;
+            
+            // แปลง receive details เป็นรูปแบบที่ PrintReceiptDialog ต้องการ
+            printItems.value = (result.details_receive || []).map(item => ({
+                item_code: item.item_code,
+                item_name: item.item_name || '',
+                unit_code: item.unit_code,
+                barcode: item.barcode || item.item_code,
+                item_year: item.item_year || '',
+                qty: parseInt(item.qty) || 0
+            }));
+            
+            // เปิด Print Dialog
+            showPrintDialog.value = true;
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: 'ไม่สามารถโหลดข้อมูลสำหรับพิมพ์ได้',
+                life: 3000
+            });
+        }
+    } catch (error) {
+        console.error('Error loading print data:', error);
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'เกิดข้อผิดพลาดในการโหลดข้อมูล',
+            life: 3000
+        });
+    }
+}
+
+// จัดการรูปภาพ
+function handleViewImages(doc) {
+    selectedDocNo.value = doc.doc_ref;
+    showImageGallery.value = true;
+}
+
+function handleImagesUpdated() {
+    // Refresh table เพื่ออัพเดท image count
+    loadReceiveDocs();
+}
 </script>
 
 <template>
@@ -216,11 +294,25 @@ function closeDetailDialog() {
                 </Toolbar>
             </div>
 
-            <ReceiveDocTable :data="receiveDocs" :loading="loading" :totalRecords="totalRecords" :currentPage="currentPage" :pageSize="pageSize" mode="close" @page-change="onPageChange" @view-detail="viewDetail" @close-job="confirmCloseJob" />
+            <ReceiveDocTable :data="receiveDocs" :loading="loading" :totalRecords="totalRecords" :currentPage="currentPage" :pageSize="pageSize" mode="close" @page-change="onPageChange" @view-detail="viewDetail" @close-job="confirmCloseJob" @print="handlePrint" @view-images="handleViewImages" />
         </div>
 
         <!-- Dialog รายละเอียดการรับ -->
         <ReceiveDetailDialog v-model:visible="detailDialog" :loading="detailLoading" :document="selectedDoc" :soDetails="soDetails" :receiveDetails="receiveDetails" @close="closeDetailDialog" />
+        
+        <!-- Print Receipt Dialog -->
+        <PrintReceiptDialog 
+            v-model:visible="showPrintDialog" 
+            :documentData="printDocumentData"
+            :items="printItems"
+        />
+        
+        <!-- Image Gallery Dialog -->
+        <ImageGalleryDialog 
+            v-model:visible="showImageGallery" 
+            :docRef="selectedDocNo"
+            @images-updated="handleImagesUpdated"
+        />
     </div>
 </template>
 
