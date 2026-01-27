@@ -16,6 +16,59 @@ const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
 
+// Branch selection
+const showBranchDialog = ref(false);
+const branches = ref([]);
+const selectedBranch = ref(null);
+
+// ดึงข้อมูลสาขาและจัดการ redirect
+const fetchBranchesAndRedirect = async () => {
+    try {
+        const branchResult = await AuthService.getBranchList(provider_name.value, database_name.value);
+
+        if (branchResult.success && branchResult.branches && branchResult.branches.length > 0) {
+            if (branchResult.branches.length === 1) {
+                // ถ้ามีสาขาเดียว เลือกอัตโนมัติ
+                const branch = branchResult.branches[0];
+                AuthService.saveBranch(branch.code, branch.name);
+                setTimeout(() => {
+                    router.push('/');
+                }, 500);
+            } else {
+                // ถ้ามีหลายสาขา แสดง dialog ให้เลือก
+                branches.value = branchResult.branches;
+                showBranchDialog.value = true;
+            }
+        } else {
+            // ไม่มีข้อมูลสาขา redirect ไป dashboard เลย
+            setTimeout(() => {
+                router.push('/');
+            }, 500);
+        }
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+        // กรณี error ให้ redirect ไป dashboard เลย
+        setTimeout(() => {
+            router.push('/');
+        }, 500);
+    }
+};
+
+// เลือกสาขา
+const selectBranch = (branch) => {
+    AuthService.saveBranch(branch.code, branch.name);
+    showBranchDialog.value = false;
+    toast.add({
+        severity: 'info',
+        summary: 'Branch Selected',
+        detail: `เลือกสาขา: ${branch.name}`,
+        life: 2000
+    });
+    setTimeout(() => {
+        router.push('/');
+    }, 500);
+};
+
 // โหลดข้อมูลที่จำไว้เมื่อ component mount
 onMounted(() => {
     const savedCredentials = localStorage.getItem('rememberedCredentials');
@@ -85,7 +138,6 @@ const handleLogin = async () => {
                 // บันทึกสิทธิ์
                 AuthService.savePermissions(permissionResult.permissions);
             }
-
             toast.add({
                 severity: 'success',
                 summary: 'Success',
@@ -93,10 +145,8 @@ const handleLogin = async () => {
                 life: 3000
             });
 
-            // Redirect ไปหน้า dashboard
-            setTimeout(() => {
-                router.push('/');
-            }, 1000);
+            // ดึงข้อมูลสาขา
+            await fetchBranchesAndRedirect();
         } else {
             toast.add({
                 severity: 'error',
@@ -142,7 +192,7 @@ const handleLogin = async () => {
                                 />
                             </g>
                         </svg>
-                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to KBYT Receipt!</div>
+                        <div class="text-surface-900 dark:text-surface-0 text-3xl font-medium mb-4">Welcome to KBYT RECEIVER!</div>
                         <span class="text-muted-color font-medium">Sign in to continue</span>
                     </div>
 
@@ -180,6 +230,25 @@ const handleLogin = async () => {
             </div>
         </div>
     </div>
+
+    <!-- Branch Selection Dialog -->
+    <Dialog v-model:visible="showBranchDialog" :closable="false" :modal="true" header="เลือกสาขา" :style="{ width: '400px' }">
+        <div class="flex flex-col gap-3">
+            <p class="text-muted-color mb-2">กรุณาเลือกสาขาที่ต้องการใช้งาน:</p>
+            <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                <div
+                    v-for="branch in branches"
+                    :key="branch.code"
+                    @click="selectBranch(branch)"
+                    class="p-4 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-primary/10 hover:border-primary transition-all duration-200"
+                    :class="{ 'bg-primary/10 border-primary': selectedBranch && selectedBranch.code === branch.code }"
+                >
+                    <div class="font-medium text-surface-900 dark:text-surface-0">{{ branch.name }}</div>
+                    <div class="text-sm text-muted-color">รหัส: {{ branch.code }}</div>
+                </div>
+            </div>
+        </div>
+    </Dialog>
 </template>
 
 <style scoped>

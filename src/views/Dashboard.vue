@@ -1,7 +1,7 @@
-<script setup>
-import { ref, onMounted } from 'vue';
-import { useToast } from 'primevue/usetoast';
+﻿<script setup>
 import ReceiveDocService from '@/service/ReceiveDocService';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const toast = useToast();
 const loading = ref(false);
@@ -13,10 +13,10 @@ const toDate = ref(now);
 
 // Stats
 const stats = ref({
-    pending: 0,      // SO ค้างรับ (status=0 + receive_qty < so_qty)
-    received: 0,     // รับแล้ว (status=0 + receive_qty === so_qty)
-    waiting: 0,      // รออนุมัติ (status=1)
-    completed: 0     // ตรวจแล้ว (status=2)
+    pending: 0, // SO ค้างรับ (status=0 + receive_qty < so_qty)
+    received: 0, // รับแล้ว (status=0 + receive_qty === so_qty)
+    waiting: 0, // รออนุมัติ (status=1)
+    completed: 0 // ตรวจแล้ว (status=2)
 });
 
 onMounted(async () => {
@@ -39,38 +39,16 @@ async function loadDashboardStats() {
         const toDateStr = formatDateForAPI(toDate.value);
 
         // ดึงข้อมูลแต่ละสถานะแบบ parallel
-        const [status0Result, status1Result, status2Result] = await Promise.all([
-            ReceiveDocService.getReceiveDocListByStatus('', fromDateStr, toDateStr, 0, 1, 999999),
-            ReceiveDocService.getReceiveDocListByStatus('', fromDateStr, toDateStr, 1, 1, 1),
-            ReceiveDocService.getReceiveDocListByStatus('', fromDateStr, toDateStr, 2, 1, 1)
-        ]);
+        const [status0Result] = await Promise.all([ReceiveDocService.getDashBoardData(fromDateStr, toDateStr)]);
 
         // Status 0: แยก SO ค้างรับ และ รับแล้ว
         if (status0Result.success) {
-            const status0Data = status0Result.data || [];
-            stats.value.pending = status0Data.filter(doc => {
-                const soQty = parseInt(doc.so_qty) || 0;
-                const receiveQty = parseInt(doc.receive_qty) || 0;
-                return receiveQty < soQty;
-            }).length;
-            
-            stats.value.received = status0Data.filter(doc => {
-                const soQty = parseInt(doc.so_qty) || 0;
-                const receiveQty = parseInt(doc.receive_qty) || 0;
-                return receiveQty === soQty;
-            }).length;
-        }
+            stats.value.pending = status0Result.total_so || 0;
+            stats.value.received = status0Result.total_received || 0;
 
-        // Status 1: รออนุมัติ
-        if (status1Result.success) {
-            stats.value.waiting = status1Result.total || 0;
+            stats.value.waiting = status0Result.total_wait || 0;
+            stats.value.completed = status0Result.total_success || 0;
         }
-
-        // Status 2: ตรวจแล้ว
-        if (status2Result.success) {
-            stats.value.completed = status2Result.total || 0;
-        }
-
     } catch (error) {
         toast.add({
             severity: 'error',
@@ -113,10 +91,10 @@ async function handleSearch() {
                         <div class="bg-orange-500 text-white rounded-xl p-3">
                             <i class="pi pi-clock text-2xl"></i>
                         </div>
-                        <Tag :value="stats.pending.toString()" severity="warning" class="text-xl font-bold px-4 py-2" />
+                        <Tag :value="stats.pending.toString()" severity="warning" class="text-2xl font-bold px-4 py-2" />
                     </div>
                     <div class="text-orange-900 dark:text-orange-100 font-semibold text-lg mb-1">SO ค้างรับ</div>
-                    <div class="text-orange-600 dark:text-orange-400 text-sm">ยังรับไม่ครบตามใบสั่ง</div>
+                    <div class="text-orange-600 dark:text-orange-400 text-sm">SO ยังไม่ถูกสร้างใบรับ</div>
                 </div>
 
                 <!-- รับแล้ว -->
@@ -164,5 +142,4 @@ async function handleSearch() {
     </div>
 </template>
 
-<style scoped lang="scss">
-</style>
+<style scoped lang="scss"></style>

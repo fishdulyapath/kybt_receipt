@@ -1,10 +1,10 @@
 <script setup>
 import { useLayout } from '@/layout/composables/layout';
-import AppConfigurator from './AppConfigurator.vue';
 import AuthService from '@/service/AuthService';
-import { useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import { computed } from 'vue';
+import { useRouter } from 'vue-router';
+import AppConfigurator from './AppConfigurator.vue';
 
 const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
 const router = useRouter();
@@ -51,7 +51,7 @@ const handleLogout = () => {
                     </g>
                 </svg>
 
-                <span>KBYT<span class="hidden lg:inline"> RECEIPT</span></span>
+                <span>KBYT<span class="hidden lg:inline"> RECEIVER</span></span>
             </router-link>
         </div>
 

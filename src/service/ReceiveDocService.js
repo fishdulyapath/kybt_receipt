@@ -9,6 +9,7 @@ class ReceiveDocService {
         try {
             const provider = AuthService.getProviderName();
             const dbname = AuthService.getDatabaseName();
+            const branch_code = AuthService.getBranchCode();
 
             const response = await axios.get(`${API_URL}getReceiveDocList`, {
                 params: {
@@ -18,7 +19,8 @@ class ReceiveDocService {
                     fromdate,
                     todate,
                     page,
-                    size
+                    size,
+                    branch_code
                 }
             });
 
@@ -71,11 +73,43 @@ class ReceiveDocService {
         }
     }
 
+    async getDashBoardData(fromdate = '', todate = '') {
+        try {
+            const provider = AuthService.getProviderName();
+            const dbname = AuthService.getDatabaseName();
+            const branch_code = AuthService.getBranchCode();
+
+            const response = await axios.get(`${API_URL}getDashBoardData`, {
+                params: {
+                    provider,
+                    dbname,
+                    fromdate,
+                    todate,
+                    branch_code
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to fetch dashboard data',
+                data: [],
+                total: 0,
+                page: 1,
+                size: 20,
+                totalPages: 0
+            };
+        }
+    }
+
     // ดึงรายการ SO
     async getSODocList(search = '', fromdate = '', todate = '', page = 1, size = 20) {
         try {
             const provider = AuthService.getProviderName();
             const dbname = AuthService.getDatabaseName();
+            const branch_code = AuthService.getBranchCode();
 
             const response = await axios.get(`${API_URL}/getSODocList`, {
                 params: {
@@ -85,7 +119,8 @@ class ReceiveDocService {
                     fromdate,
                     todate,
                     page,
-                    size
+                    size,
+                    branch_code
                 }
             });
 

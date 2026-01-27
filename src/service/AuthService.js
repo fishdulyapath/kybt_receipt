@@ -195,6 +195,8 @@ export default class AuthService {
         localStorage.removeItem('userPermissions');
         localStorage.removeItem('provider_name');
         localStorage.removeItem('database_name');
+        localStorage.removeItem('branch_code');
+        localStorage.removeItem('branch_name');
     }
 
     /**
@@ -202,5 +204,81 @@ export default class AuthService {
      */
     static isAuthenticated() {
         return this.getUser() !== null;
+    }
+
+    /**
+     * ดึงรายการสาขาจาก API
+     * @param {string} provider_name - ชื่อ provider
+     * @param {string} database_name - ชื่อ database
+     * @returns {Promise<Object>} ผลลัพธ์รายการสาขา
+     */
+    static async getBranchList(provider_name, database_name) {
+        try {
+            const baseUrl = import.meta.env.VITE_SERVICE_API_URL;
+
+            const params = new URLSearchParams({
+                provider: provider_name,
+                dbname: database_name
+            });
+
+            const url = `${baseUrl}getBranchList?${params.toString()}`;
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                return {
+                    success: true,
+                    branches: result.data
+                };
+            } else {
+                return {
+                    success: false,
+                    message: 'No branches found',
+                    branches: []
+                };
+            }
+        } catch (error) {
+            console.error('Fetch branch list error:', error);
+            return {
+                success: false,
+                message: error.message || 'An error occurred while fetching branches',
+                branches: []
+            };
+        }
+    }
+
+    /**
+     * บันทึกข้อมูลสาขาลง localStorage
+     * @param {string} code - รหัสสาขา
+     * @param {string} name - ชื่อสาขา
+     */
+    static saveBranch(code, name) {
+        localStorage.setItem('branch_code', code);
+        localStorage.setItem('branch_name', name);
+    }
+
+    /**
+     * ดึง branch_code จาก localStorage
+     */
+    static getBranchCode() {
+        return localStorage.getItem('branch_code');
+    }
+
+    /**
+     * ดึง branch_name จาก localStorage
+     */
+    static getBranchName() {
+        return localStorage.getItem('branch_name');
     }
 }
