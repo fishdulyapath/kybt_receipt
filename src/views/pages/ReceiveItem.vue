@@ -91,6 +91,14 @@ onMounted(async () => {
         router.push({ name: 'receivedoc' });
         return;
     }
+    if (barcodeInputRef.value && barcodeInputRef.value.$el) {
+        const inputElement = barcodeInputRef.value.$el;
+        if (inputElement && typeof inputElement.focus === 'function') {
+            setTimeout(() => {
+                inputElement.focus();
+            }, 300);
+        }
+    }
     await loadReceiveDocDetail();
 });
 
