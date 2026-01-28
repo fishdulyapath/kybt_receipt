@@ -44,6 +44,7 @@ class ReceiveDocService {
         try {
             const provider = AuthService.getProviderName();
             const dbname = AuthService.getDatabaseName();
+            const branch_code = AuthService.getBranchCode();
 
             const response = await axios.get(`${API_URL}getReceiveDocList`, {
                 params: {
@@ -54,7 +55,8 @@ class ReceiveDocService {
                     todate,
                     status,
                     page,
-                    size
+                    size,
+                    branch_code
                 }
             });
 
