@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const emit = defineEmits(['page-change', 'receive-item', 'send-approve', 'delete', 'close-job', 'view-detail', 'row-click', 'print', 'view-images']);
 
@@ -197,7 +197,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
         </template>
 
         <!-- 1. วันที่ / วันที่ปิดงาน -->
-        <Column v-if="showCloseDateTime" field="close_date" header="วันที่ปิดงาน" :sortable="true" style="min-width: 14rem">
+        <Column v-if="showCloseDateTime" field="close_date" header="วันที่ปิดงาน" :sortable="false" style="min-width: 14rem">
             <template #body="{ data }">
                 <div class="flex flex-col gap-1">
                     <div class="flex items-center gap-2">
@@ -211,7 +211,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
                 </div>
             </template>
         </Column>
-        <Column v-else field="doc_date" header="วันที่" :sortable="true" style="min-width: 10rem">
+        <Column v-else field="doc_date" header="วันที่" :sortable="false" style="min-width: 10rem">
             <template #body="{ data }">
                 <div class="flex items-center gap-2">
                     <i class="pi pi-calendar text-muted-color"></i>
@@ -221,22 +221,28 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
         </Column>
 
         <!-- 2. เลขที่ใบรับ -->
-        <Column field="doc_no" header="เลขที่ใบรับ" :sortable="true" style="min-width: 14rem">
+        <Column field="doc_no" header="เลขที่ใบรับ" :sortable="false" style="min-width: 14rem">
             <template #body="{ data }">
                 <span class="font-semibold text-primary">{{ data.doc_no }}</span>
             </template>
         </Column>
 
         <!-- 3. เลขที่ SO -->
-        <Column field="doc_ref" header="เลขที่ SO" :sortable="true" style="min-width: 12rem">
+        <Column field="doc_ref" header="เลขที่ SO" :sortable="false" style="min-width: 12rem">
             <template #body="{ data }">
                 <Tag v-if="data.doc_ref" :value="data.doc_ref" severity="info" />
                 <span v-else class="text-muted-color">-</span>
             </template>
         </Column>
 
+        <Column field="logistic_area" header="เขตขนส่ง" :sortable="false" style="min-width: 12rem">
+            <template #body="{ data }">
+                <span class="font-semibold text-primary">{{ data.logistic_area || '-' }}</span>
+            </template>
+        </Column>
+
         <!-- 4. จำนวนที่ต้องรับ (SO Qty) -->
-        <Column field="so_qty" header="จำนวนที่ต้องรับ" :sortable="true" style="min-width: 10rem">
+        <Column field="so_qty" header="จำนวนที่ต้องรับ" :sortable="false" style="min-width: 10rem">
             <template #body="{ data }">
                 <div class="flex items-center gap-2">
                     <i class="pi pi-box text-blue-500"></i>
@@ -246,7 +252,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
         </Column>
 
         <!-- 5. จำนวนรับ (Receive Qty) - เน้นให้เด่น -->
-        <Column field="receive_qty" header="จำนวนรับ" :sortable="true" style="min-width: 10rem">
+        <Column field="receive_qty" header="จำนวนรับ" :sortable="false" style="min-width: 10rem">
             <template #body="{ data }">
                 <div class="flex items-center gap-2">
                     <i class="pi pi-check-circle text-green-500"></i>
@@ -283,7 +289,17 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />
                     <Button icon="pi pi-check-circle" label="ปิดงาน" size="small" severity="success" @click="emit('close-job', slotProps.data)" v-tooltip.top="'ปิดงาน'" />
-                    <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', slotProps.data)" outlined v-tooltip.top="'จัดการรูปภาพ'" :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null" badgeClass="p-badge-success" />
+                    <Button
+                        icon="pi pi-images"
+                        label="รูปภาพ"
+                        size="small"
+                        severity="help"
+                        @click="emit('view-images', slotProps.data)"
+                        outlined
+                        v-tooltip.top="'จัดการรูปภาพ'"
+                        :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null"
+                        badgeClass="p-badge-success"
+                    />
                     <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
                 </div>
             </template>
@@ -301,7 +317,17 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
             <template #body="slotProps">
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />
-                    <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', slotProps.data)" outlined v-tooltip.top="'ดูรูปภาพ'" :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null" badgeClass="p-badge-success" />
+                    <Button
+                        icon="pi pi-images"
+                        label="รูปภาพ"
+                        size="small"
+                        severity="help"
+                        @click="emit('view-images', slotProps.data)"
+                        outlined
+                        v-tooltip.top="'ดูรูปภาพ'"
+                        :badge="slotProps.data.image_count > 0 ? String(slotProps.data.image_count) : null"
+                        badgeClass="p-badge-success"
+                    />
                     <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
                 </div>
             </template>

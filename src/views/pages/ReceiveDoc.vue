@@ -1,8 +1,8 @@
 <script setup>
-import ReceiveDocService from '@/service/ReceiveDocService';
-import ReceiveDocTable from '@/components/ReceiveDocTable.vue';
-import ReceiveDetailDialog from '@/components/ReceiveDetailDialog.vue';
 import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
+import ReceiveDetailDialog from '@/components/ReceiveDetailDialog.vue';
+import ReceiveDocTable from '@/components/ReceiveDocTable.vue';
+import ReceiveDocService from '@/service/ReceiveDocService';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
@@ -369,12 +369,12 @@ async function handlePrint(doc) {
     try {
         // โหลดข้อมูล document และ items
         const result = await ReceiveDocService.getReceiveDocDetail(doc.doc_no);
-        
+
         if (result.success) {
             // คำนวณยอดรวมของ SO และ Receive
             const totalSOQty = (result.details_so || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
             const totalReceiveQty = (result.details_receive || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
-            
+
             // เช็คว่าจำนวนที่รับเท่ากับ SO หรือไม่
             if (totalReceiveQty !== totalSOQty) {
                 toast.add({
@@ -385,12 +385,12 @@ async function handlePrint(doc) {
                 });
                 return;
             }
-            
+
             // เตรียมข้อมูล document
             printDocumentData.value = doc;
-            
+
             // แปลง receive details เป็นรูปแบบที่ PrintReceiptDialog ต้องการ
-            printItems.value = (result.details_receive || []).map(item => ({
+            printItems.value = (result.details_receive || []).map((item) => ({
                 item_code: item.item_code,
                 item_name: item.item_name || '',
                 unit_code: item.unit_code,
@@ -398,7 +398,7 @@ async function handlePrint(doc) {
                 item_year: item.item_year || '',
                 qty: parseInt(item.qty) || 0
             }));
-            
+
             // เปิด Print Dialog
             showPrintDialog.value = true;
         } else {
@@ -608,6 +608,8 @@ function closeDetailDialog() {
 
                         <Column field="branch_code" header="สาขา" :sortable="true" style="min-width: 8rem"></Column>
 
+                        <Column field="logistic_area" header="เขตขนส่ง" :sortable="true" style="min-width: 8rem"></Column>
+
                         <Column field="remark" header="หมายเหตุ" style="min-width: 15rem"></Column>
 
                         <Column header="จัดการ" :exportable="false" style="min-width: 10rem">
@@ -639,6 +641,10 @@ function closeDetailDialog() {
                             <div>
                                 <label class="text-xs text-muted-color block mb-1">พนักงานขาย</label>
                                 <p class="font-semibold text-sm">{{ selectedSO.sale_name || '-' }}</p>
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted-color block mb-1">เขตขนส่ง</label>
+                                <p class="font-semibold text-sm">{{ selectedSO.logistic_area || '-' }}</p>
                             </div>
                             <div>
                                 <label class="text-xs text-muted-color block mb-1">สาขา</label>
@@ -673,11 +679,7 @@ function closeDetailDialog() {
         <ReceiveDetailDialog v-model:visible="detailDialog" :loading="detailLoading" :document="selectedDoc" :soDetails="soDetails" :receiveDetails="receiveDetails" @close="closeDetailDialog" />
 
         <!-- Print Receipt Dialog -->
-        <PrintReceiptDialog 
-            v-model:visible="showPrintDialog" 
-            :documentData="printDocumentData"
-            :items="printItems"
-        />
+        <PrintReceiptDialog v-model:visible="showPrintDialog" :documentData="printDocumentData" :items="printItems" />
     </div>
 </template>
 

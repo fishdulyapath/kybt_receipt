@@ -1,8 +1,8 @@
 <script setup>
-import ReceiveDocService from '@/service/ReceiveDocService';
 import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
+import ReceiveDocService from '@/service/ReceiveDocService';
 import { useToast } from 'primevue/usetoast';
-import { computed, onMounted, ref, onUnmounted, nextTick } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
@@ -25,6 +25,7 @@ const searchResults = ref([]);
 // Barcode Scanning
 const barcodeInput = ref('');
 const barcodeInputRef = ref(null);
+const searchInputRef = ref(null);
 
 // Input Mode Selection
 const inputMode = ref('barcode'); // 'barcode' or 'search'
@@ -32,6 +33,31 @@ const inputModes = ref([
     { name: 'Scan Barcode', value: 'barcode', icon: 'pi pi-qrcode' },
     { name: 'ค้นหาสินค้า', value: 'search', icon: 'pi pi-search' }
 ]);
+
+// Watch inputMode เพื่อ focus input เมื่อสลับ mode
+watch(inputMode, (newMode) => {
+    nextTick(() => {
+        if (newMode === 'barcode') {
+            if (barcodeInputRef.value && barcodeInputRef.value.$el) {
+                const inputElement = barcodeInputRef.value.$el;
+                if (inputElement && typeof inputElement.focus === 'function') {
+                    setTimeout(() => {
+                        inputElement.focus();
+                    }, 200);
+                }
+            }
+        } else if (newMode === 'search') {
+            if (searchInputRef.value && searchInputRef.value.$el) {
+                const inputElement = searchInputRef.value.$el.querySelector('input');
+                if (inputElement && typeof inputElement.focus === 'function') {
+                    setTimeout(() => {
+                        inputElement.focus();
+                    }, 200);
+                }
+            }
+        }
+    });
+});
 
 // Scanned Items List
 const scannedItems = ref([]);
@@ -556,14 +582,14 @@ async function saveReceiveDoc() {
             if (totalScannedQty.value === totalSOQty.value) {
                 // โหลดข้อมูล document อีกครั้งเพื่อเตรียมพิมพ์
                 await loadDocumentDataForPrint();
-                
+
                 // เปิด Print Dialog
                 showPrintDialog.value = true;
             } else {
                 // ถ้าจำนวนไม่เท่ากัน ให้กลับไปหน้ารายการทันที
                 router.push({ name: 'receivedoc' });
             }
-            
+
             showSummaryDialog.value = false;
         } else {
             loading.value = false;
@@ -590,7 +616,7 @@ async function loadDocumentDataForPrint() {
     try {
         // ดึงข้อมูลจาก API getReceiveDocList เพื่อหาข้อมูลเอกสาร
         const result = await ReceiveDocService.getReceiveDocList(docno.value, '', '', 1, 1);
-        
+
         if (result.success && result.data && result.data.length > 0) {
             documentData.value = result.data[0];
         } else {
@@ -684,6 +710,7 @@ onUnmounted(() => {
                 <IconField>
                     <InputIcon class="pi pi-search" />
                     <AutoComplete
+                        ref="searchInputRef"
                         v-model="selectedItem"
                         :suggestions="searchResults"
                         @complete="handleSearch"
@@ -988,12 +1015,7 @@ onUnmounted(() => {
         </Dialog>
 
         <!-- Print Receipt Dialog -->
-        <PrintReceiptDialog 
-            :visible="showPrintDialog" 
-            @update:visible="handlePrintDialogClose"
-            :documentData="documentData"
-            :items="scannedItems"
-        />
+        <PrintReceiptDialog :visible="showPrintDialog" @update:visible="handlePrintDialogClose" :documentData="documentData" :items="scannedItems" />
     </div>
 </template>
 

@@ -118,7 +118,11 @@ const combinedDetails = computed(() => {
                         <label class="text-sm text-muted-color">สาขา</label>
                         <p class="font-semibold">{{ document?.branch_code }}</p>
                     </div>
-                    <div v-if="document?.remark" class="md:col-span-3">
+                    <div>
+                        <label class="text-sm text-muted-color">เขตขนส่ง</label>
+                        <p class="font-semibold">{{ document?.logistic_area || '-' }}</p>
+                    </div>
+                    <div v-if="document?.remark">
                         <label class="text-sm text-muted-color">หมายเหตุ</label>
                         <p class="font-semibold">{{ document?.remark }}</p>
                     </div>
