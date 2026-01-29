@@ -78,6 +78,13 @@ function onMobilePageChange(direction) {
     });
 }
 
+function formatNumber(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = Number(value);
+    if (isNaN(num)) return '-';
+    return num.toLocaleString('en-US');
+}
+
 const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize));
 </script>
 
@@ -129,29 +136,31 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
 
                 <!-- Mobile Actions -->
                 <div v-if="mode === 'default'" class="flex flex-col gap-2 pt-3 border-t" @click.stop>
-                    <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', doc)" fluid />
-                    <Button icon="pi pi-box" label="รับสินค้า" size="small" severity="success" @click="emit('receive-item', doc)" fluid />
                     <div class="grid grid-cols-2 gap-2">
-                        <Button icon="pi pi-send" label="ส่งอนุมัติ" size="small" severity="info" :disabled="!canApprove(doc)" @click="emit('send-approve', doc)" />
-                        <Button icon="pi pi-trash" label="ลบ" size="small" severity="danger" @click="emit('delete', doc)" />
+                        <Button icon="pi pi-eye" label="รายละเอียด" severity="info" @click="emit('view-detail', doc)" fluid />
+                        <Button icon="pi pi-box" label="รับสินค้า" severity="success" @click="emit('receive-item', doc)" fluid />
                     </div>
-                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" fluid outlined />
+                    <div class="grid grid-cols-2 gap-2">
+                        <Button icon="pi pi-send" label="ส่งอนุมัติ" severity="info" :disabled="!canApprove(doc)" @click="emit('send-approve', doc)" />
+                        <Button icon="pi pi-trash" label="ลบ" severity="danger" @click="emit('delete', doc)" />
+                    </div>
+                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" severity="secondary" @click="emit('print', doc)" fluid outlined />
                 </div>
 
                 <div v-if="mode === 'close'" class="flex flex-col gap-2 pt-3 border-t" @click.stop>
-                    <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', doc)" fluid class="mb-2" />
+                    <Button icon="pi pi-eye" label="ดูรายละเอียด" severity="info" @click="emit('view-detail', doc)" fluid class="mb-2" />
                     <div class="grid grid-cols-2 gap-2">
-                        <Button icon="pi pi-check-circle" label="ปิดงาน" size="small" severity="success" @click="emit('close-job', doc)" />
-                        <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
+                        <Button icon="pi pi-check-circle" label="ปิดงาน" severity="success" @click="emit('close-job', doc)" />
+                        <Button icon="pi pi-images" label="รูปภาพ" severity="help" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
                     </div>
-                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" fluid outlined />
+                    <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" severity="secondary" @click="emit('print', doc)" fluid outlined />
                 </div>
 
                 <div v-if="mode === 'history'" class="flex flex-col gap-2 pt-3 border-t" @click.stop>
-                    <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', doc)" fluid />
+                    <Button icon="pi pi-eye" label="ดูรายละเอียด" severity="info" @click="emit('view-detail', doc)" fluid />
                     <div class="grid grid-cols-2 gap-2">
-                        <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" @click="emit('print', doc)" outlined />
-                        <Button icon="pi pi-images" label="รูปภาพ" size="small" severity="help" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
+                        <Button v-if="canPrint(doc)" icon="pi pi-print" label="พิมพ์" severity="secondary" @click="emit('print', doc)" outlined />
+                        <Button icon="pi pi-images" label="รูปภาพ" size="small" @click="emit('view-images', doc)" outlined :badge="doc.image_count > 0 ? String(doc.image_count) : null" badgeClass="p-badge-success" />
                     </div>
                 </div>
             </div>
@@ -241,6 +250,12 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
             </template>
         </Column>
 
+        <Column field="mile" header="เลขไมล์" :sortable="false" style="min-width: 12rem">
+            <template #body="{ data }">
+                <span class="font-semibold text-primary">{{ formatNumber(data.mile) }}</span>
+            </template>
+        </Column>
+
         <!-- 4. จำนวนที่ต้องรับ (SO Qty) -->
         <Column field="so_qty" header="จำนวนที่ต้องรับ" :sortable="false" style="min-width: 10rem">
             <template #body="{ data }">
@@ -313,7 +328,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
         </Column>
 
         <!-- History Mode: จัดการ -->
-        <Column v-if="mode === 'history'" header="จัดการ" :exportable="false" style="min-width: 20rem">
+        <Column v-if="mode === 'history'" header="จัดการ" :exportable="false" style="min-width: 23rem">
             <template #body="slotProps">
                 <div class="flex flex-wrap gap-2" @click.stop>
                     <Button icon="pi pi-eye" label="ดูรายละเอียด" size="small" severity="info" @click="emit('view-detail', slotProps.data)" v-tooltip.top="'ดูรายละเอียด'" />

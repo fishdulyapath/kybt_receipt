@@ -300,6 +300,13 @@ async function confirmDelete(docData) {
     });
 }
 
+function formatNumber(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = Number(value);
+    if (isNaN(num)) return '-';
+    return num.toLocaleString('en-US');
+}
+
 async function handleDelete(docData) {
     loading.value = true;
     try {
@@ -590,25 +597,31 @@ function closeDetailDialog() {
                         <template #empty> ไม่พบข้อมูล SO </template>
                         <template #loading> กำลังโหลดข้อมูล... </template>
 
-                        <Column field="doc_no" header="เลขที่ SO" :sortable="true" style="min-width: 12rem">
+                        <Column field="doc_no" header="เลขที่ SO" :sortable="false" style="min-width: 12rem">
                             <template #body="{ data }">
                                 <span class="font-semibold text-primary">{{ data.doc_no }}</span>
                             </template>
                         </Column>
 
-                        <Column field="doc_date" header="วันที่" :sortable="true" style="min-width: 10rem">
+                        <Column field="doc_date" header="วันที่" :sortable="false" style="min-width: 10rem">
                             <template #body="{ data }">
                                 {{ formatDate(data.doc_date) }}
                             </template>
                         </Column>
 
-                        <Column field="cust_name" header="ลูกค้า" :sortable="true" style="min-width: 12rem"></Column>
+                        <Column field="cust_name" header="ลูกค้า" :sortable="false" style="min-width: 12rem"></Column>
 
                         <Column field="sale_name" header="พนักงานขาย" style="min-width: 12rem"></Column>
 
-                        <Column field="branch_code" header="สาขา" :sortable="true" style="min-width: 8rem"></Column>
+                        <Column field="branch_code" header="สาขา" :sortable="false" style="min-width: 8rem"></Column>
 
-                        <Column field="logistic_area" header="เขตขนส่ง" :sortable="true" style="min-width: 8rem"></Column>
+                        <Column field="logistic_area" header="เขตขนส่ง" :sortable="false" style="min-width: 8rem"></Column>
+
+                        <Column field="mile" header="เลขไมล์" :sortable="false" style="min-width: 8rem">
+                            <template #body="{ data }">
+                                {{ formatNumber(data.mile) }}
+                            </template>
+                        </Column>
 
                         <Column field="remark" header="หมายเหตุ" style="min-width: 15rem"></Column>
 
@@ -645,6 +658,10 @@ function closeDetailDialog() {
                             <div>
                                 <label class="text-xs text-muted-color block mb-1">เขตขนส่ง</label>
                                 <p class="font-semibold text-sm">{{ selectedSO.logistic_area || '-' }}</p>
+                            </div>
+                            <div>
+                                <label class="text-xs text-muted-color block mb-1">เลขไมล์</label>
+                                <p class="font-semibold text-sm">{{ formatNumber(selectedSO.mile) }}</p>
                             </div>
                             <div>
                                 <label class="text-xs text-muted-color block mb-1">สาขา</label>

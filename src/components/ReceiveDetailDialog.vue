@@ -35,6 +35,13 @@ function formatDate(dateStr) {
     return `${day}-${month}-${year}`;
 }
 
+function formatNumber(value) {
+    if (value === null || value === undefined || value === '') return '-';
+    const num = Number(value);
+    if (isNaN(num)) return '-';
+    return num.toLocaleString('en-US');
+}
+
 function handleClose() {
     emit('update:visible', false);
     emit('close');
@@ -121,6 +128,10 @@ const combinedDetails = computed(() => {
                     <div>
                         <label class="text-sm text-muted-color">เขตขนส่ง</label>
                         <p class="font-semibold">{{ document?.logistic_area || '-' }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-muted-color">เลขไมล์</label>
+                        <p class="font-semibold">{{ formatNumber(document?.mile) }}</p>
                     </div>
                     <div v-if="document?.remark">
                         <label class="text-sm text-muted-color">หมายเหตุ</label>
