@@ -1,28 +1,45 @@
 <script setup>
 import AuthService from '@/service/AuthService';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AppMenu from './AppMenu.vue';
 
 const toast = useToast();
 
 // Branch
-const currentBranchCode = ref('');
 const currentBranchName = ref('');
+const selectedBranches = ref([]);
 const showBranchDialog = ref(false);
 const branches = ref([]);
 const loadingBranches = ref(false);
 
+// Temporary selection (ใช้ระหว่างที่ dialog เปิดอยู่)
+const tempSelectedBranches = ref([]);
+
 onMounted(() => {
     // โหลดข้อมูลสาขาที่เลือกไว้
-    currentBranchCode.value = AuthService.getBranchCode() || '';
+    selectedBranches.value = AuthService.getSelectedBranches() || [];
     currentBranchName.value = AuthService.getBranchName() || '';
+});
+
+// คำนวณชื่อสาขาที่แสดง
+const displayBranchName = computed(() => {
+    if (selectedBranches.value.length === 0) {
+        return 'เลือกสาขา';
+    } else if (selectedBranches.value.length === 1) {
+        return selectedBranches.value[0].name;
+    } else {
+        return `${selectedBranches.value.length} สาขา`;
+    }
 });
 
 // เปิด dialog เลือกสาขา
 async function openChangeBranchDialog() {
     loadingBranches.value = true;
     showBranchDialog.value = true;
+
+    // คัดลอก selectedBranches ไปยัง tempSelectedBranches
+    tempSelectedBranches.value = [...selectedBranches.value];
 
     try {
         const provider = AuthService.getProviderName();
@@ -53,17 +70,53 @@ async function openChangeBranchDialog() {
     }
 }
 
-// เลือกสาขา
-function selectBranch(branch) {
-    AuthService.saveBranch(branch.code, branch.name);
-    currentBranchCode.value = branch.code;
-    currentBranchName.value = branch.name;
+// ตรวจสอบว่าสาขานี้ถูกเลือกอยู่หรือไม่
+function isBranchSelected(branch) {
+    return tempSelectedBranches.value.some((b) => b.code === branch.code);
+}
+
+// Toggle เลือก/ไม่เลือกสาขา
+function toggleBranch(branch) {
+    const index = tempSelectedBranches.value.findIndex((b) => b.code === branch.code);
+    if (index !== -1) {
+        tempSelectedBranches.value.splice(index, 1);
+    } else {
+        tempSelectedBranches.value.push({ code: branch.code, name: branch.name });
+    }
+}
+
+// เลือกทั้งหมด
+function selectAll() {
+    tempSelectedBranches.value = branches.value.map((b) => ({ code: b.code, name: b.name }));
+}
+
+// ไม่เลือกทั้งหมด
+function deselectAll() {
+    tempSelectedBranches.value = [];
+}
+
+// บันทึกการเลือกสาขา
+function saveBranchSelection() {
+    if (tempSelectedBranches.value.length === 0) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Warning',
+            detail: 'กรุณาเลือกอย่างน้อย 1 สาขา',
+            life: 3000
+        });
+        return;
+    }
+
+    AuthService.saveBranches(tempSelectedBranches.value);
+    selectedBranches.value = [...tempSelectedBranches.value];
+    currentBranchName.value = AuthService.getBranchName();
     showBranchDialog.value = false;
 
+    const branchNames = tempSelectedBranches.value.map((b) => b.name).join(', ');
     toast.add({
         severity: 'success',
         summary: 'สำเร็จ',
-        detail: `เปลี่ยนสาขาเป็น: ${branch.name}`,
+        detail: `เลือกสาขา: ${branchNames}`,
         life: 2000
     });
 
@@ -81,7 +134,7 @@ function selectBranch(branch) {
             </div>
             <div class="branch-info">
                 <span class="branch-label">สาขา</span>
-                <span class="branch-name">{{ currentBranchName || 'เลือกสาขา' }}</span>
+                <span class="branch-name">{{ displayBranchName }}</span>
             </div>
             <i class="pi pi-chevron-down branch-arrow"></i>
         </div>
@@ -90,9 +143,9 @@ function selectBranch(branch) {
     </div>
 
     <!-- Branch Selection Dialog -->
-    <Dialog v-model:visible="showBranchDialog" :modal="true" header="เลือกสาขา" :style="{ width: '450px' }">
+    <Dialog v-model:visible="showBranchDialog" :modal="true" header="เลือกสาขา" :style="{ width: '500px' }">
         <div class="flex flex-col gap-3">
-            <p class="text-muted-color mb-2">กรุณาเลือกสาขาที่ต้องการใช้งาน:</p>
+            <p class="text-muted-color mb-2">กรุณาเลือกสาขาที่ต้องการใช้งาน (เลือกได้หลายสาขา):</p>
 
             <!-- Loading -->
             <div v-if="loadingBranches" class="flex items-center justify-center py-8">
@@ -100,31 +153,43 @@ function selectBranch(branch) {
             </div>
 
             <!-- Branch List -->
-            <div v-else class="flex flex-col gap-2 max-h-80 overflow-y-auto">
-                <div v-if="branches.length === 0" class="text-center py-8 text-muted-color">
-                    <i class="pi pi-inbox text-4xl mb-2"></i>
-                    <p>ไม่พบข้อมูลสาขา</p>
+            <div v-else>
+                <!-- Select All / Deselect All -->
+                <div v-if="branches.length > 0" class="flex items-center justify-between mb-3 pb-2 border-b border-surface-200 dark:border-surface-700">
+                    <span class="text-sm text-muted-color">เลือกแล้ว {{ tempSelectedBranches.length }} / {{ branches.length }} สาขา</span>
+                    <div class="flex gap-2">
+                        <Button label="เลือกทั้งหมด" size="small" text @click="selectAll" />
+                        <Button label="ไม่เลือก" size="small" text severity="secondary" @click="deselectAll" />
+                    </div>
                 </div>
-                <div
-                    v-for="branch in branches"
-                    :key="branch.code"
-                    @click="selectBranch(branch)"
-                    class="p-4 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-primary/10 hover:border-primary transition-all duration-200"
-                    :class="{ 'bg-primary/10 border-primary': currentBranchCode === branch.code }"
-                >
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="font-medium text-surface-900 dark:text-surface-0">{{ branch.name }}</div>
-                            <div class="text-sm text-muted-color">รหัส: {{ branch.code }}</div>
+
+                <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                    <div v-if="branches.length === 0" class="text-center py-8 text-muted-color">
+                        <i class="pi pi-inbox text-4xl mb-2"></i>
+                        <p>ไม่พบข้อมูลสาขา</p>
+                    </div>
+                    <div
+                        v-for="branch in branches"
+                        :key="branch.code"
+                        @click="toggleBranch(branch)"
+                        class="p-4 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-primary/10 hover:border-primary transition-all duration-200"
+                        :class="{ 'bg-primary/10 border-primary': isBranchSelected(branch) }"
+                    >
+                        <div class="flex items-center gap-3">
+                            <Checkbox :modelValue="isBranchSelected(branch)" :binary="true" @click.stop="toggleBranch(branch)" />
+                            <div class="flex-1">
+                                <div class="font-medium text-surface-900 dark:text-surface-0">{{ branch.name }}</div>
+                                <div class="text-sm text-muted-color">รหัส: {{ branch.code }}</div>
+                            </div>
                         </div>
-                        <i v-if="currentBranchCode === branch.code" class="pi pi-check-circle text-primary text-xl"></i>
                     </div>
                 </div>
             </div>
         </div>
 
         <template #footer>
-            <Button label="ปิด" severity="secondary" @click="showBranchDialog = false" />
+            <Button label="ยกเลิก" severity="secondary" @click="showBranchDialog = false" />
+            <Button label="บันทึก" icon="pi pi-check" @click="saveBranchSelection" :disabled="tempSelectedBranches.length === 0" />
         </template>
     </Dialog>
 </template>

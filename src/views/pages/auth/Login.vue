@@ -16,10 +16,10 @@ const password = ref('');
 const checked = ref(false);
 const loading = ref(false);
 
-// Branch selection
+// Branch selection (หลายสาขา)
 const showBranchDialog = ref(false);
 const branches = ref([]);
-const selectedBranch = ref(null);
+const tempSelectedBranches = ref([]);
 
 // ดึงข้อมูลสาขาและจัดการ redirect
 const fetchBranchesAndRedirect = async () => {
@@ -30,13 +30,14 @@ const fetchBranchesAndRedirect = async () => {
             if (branchResult.branches.length === 1) {
                 // ถ้ามีสาขาเดียว เลือกอัตโนมัติ
                 const branch = branchResult.branches[0];
-                AuthService.saveBranch(branch.code, branch.name);
+                AuthService.saveBranches([{ code: branch.code, name: branch.name }]);
                 setTimeout(() => {
                     router.push('/');
                 }, 500);
             } else {
                 // ถ้ามีหลายสาขา แสดง dialog ให้เลือก
                 branches.value = branchResult.branches;
+                tempSelectedBranches.value = [];
                 showBranchDialog.value = true;
             }
         } else {
@@ -54,14 +55,51 @@ const fetchBranchesAndRedirect = async () => {
     }
 };
 
-// เลือกสาขา
-const selectBranch = (branch) => {
-    AuthService.saveBranch(branch.code, branch.name);
+// ตรวจสอบว่าสาขานี้ถูกเลือกอยู่หรือไม่
+const isBranchSelected = (branch) => {
+    return tempSelectedBranches.value.some((b) => b.code === branch.code);
+};
+
+// Toggle เลือก/ไม่เลือกสาขา
+const toggleBranch = (branch) => {
+    const index = tempSelectedBranches.value.findIndex((b) => b.code === branch.code);
+    if (index !== -1) {
+        tempSelectedBranches.value.splice(index, 1);
+    } else {
+        tempSelectedBranches.value.push({ code: branch.code, name: branch.name });
+    }
+};
+
+// เลือกทั้งหมด
+const selectAll = () => {
+    tempSelectedBranches.value = branches.value.map((b) => ({ code: b.code, name: b.name }));
+};
+
+// ไม่เลือกทั้งหมด
+const deselectAll = () => {
+    tempSelectedBranches.value = [];
+};
+
+// บันทึกการเลือกสาขา
+const saveBranchSelection = () => {
+    if (tempSelectedBranches.value.length === 0) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Warning',
+            detail: 'กรุณาเลือกอย่างน้อย 1 สาขา',
+            life: 3000
+        });
+        return;
+    }
+
+    AuthService.saveBranches(tempSelectedBranches.value);
     showBranchDialog.value = false;
+
+    const branchNames = tempSelectedBranches.value.map((b) => b.name).join(', ');
     toast.add({
         severity: 'info',
         summary: 'Branch Selected',
-        detail: `เลือกสาขา: ${branch.name}`,
+        detail: `เลือกสาขา: ${branchNames}`,
         life: 2000
     });
     setTimeout(() => {
@@ -232,22 +270,41 @@ const handleLogin = async () => {
     </div>
 
     <!-- Branch Selection Dialog -->
-    <Dialog v-model:visible="showBranchDialog" :closable="false" :modal="true" header="เลือกสาขา" :style="{ width: '400px' }">
+    <Dialog v-model:visible="showBranchDialog" :closable="false" :modal="true" header="เลือกสาขา" :style="{ width: '500px' }">
         <div class="flex flex-col gap-3">
-            <p class="text-muted-color mb-2">กรุณาเลือกสาขาที่ต้องการใช้งาน:</p>
+            <p class="text-muted-color mb-2">กรุณาเลือกสาขาที่ต้องการใช้งาน (เลือกได้หลายสาขา):</p>
+
+            <!-- Select All / Deselect All -->
+            <div v-if="branches.length > 0" class="flex items-center justify-between mb-3 pb-2 border-b border-surface-200 dark:border-surface-700">
+                <span class="text-sm text-muted-color">เลือกแล้ว {{ tempSelectedBranches.length }} / {{ branches.length }} สาขา</span>
+                <div class="flex gap-2">
+                    <Button label="เลือกทั้งหมด" size="small" text @click="selectAll" />
+                    <Button label="ไม่เลือก" size="small" text severity="secondary" @click="deselectAll" />
+                </div>
+            </div>
+
             <div class="flex flex-col gap-2 max-h-80 overflow-y-auto">
                 <div
                     v-for="branch in branches"
                     :key="branch.code"
-                    @click="selectBranch(branch)"
+                    @click="toggleBranch(branch)"
                     class="p-4 border border-surface-200 dark:border-surface-700 rounded-lg cursor-pointer hover:bg-primary/10 hover:border-primary transition-all duration-200"
-                    :class="{ 'bg-primary/10 border-primary': selectedBranch && selectedBranch.code === branch.code }"
+                    :class="{ 'bg-primary/10 border-primary': isBranchSelected(branch) }"
                 >
-                    <div class="font-medium text-surface-900 dark:text-surface-0">{{ branch.name }}</div>
-                    <div class="text-sm text-muted-color">รหัส: {{ branch.code }}</div>
+                    <div class="flex items-center gap-3">
+                        <Checkbox :modelValue="isBranchSelected(branch)" :binary="true" @click.stop="toggleBranch(branch)" />
+                        <div class="flex-1">
+                            <div class="font-medium text-surface-900 dark:text-surface-0">{{ branch.name }}</div>
+                            <div class="text-sm text-muted-color">รหัส: {{ branch.code }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
+
+        <template #footer>
+            <Button label="บันทึก" icon="pi pi-check" @click="saveBranchSelection" :disabled="tempSelectedBranches.length === 0" />
+        </template>
     </Dialog>
 </template>
 

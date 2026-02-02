@@ -259,20 +259,56 @@ export default class AuthService {
     }
 
     /**
-     * บันทึกข้อมูลสาขาลง localStorage
+     * บันทึกข้อมูลสาขาลง localStorage (รองรับหลายสาขา)
+     * @param {Array} branches - array ของสาขา [{code, name}, ...]
+     */
+    static saveBranches(branches) {
+        localStorage.setItem('selected_branches', JSON.stringify(branches));
+        // เก็บ branch_code เป็น comma-separated สำหรับ backward compatibility
+        const codes = branches.map((b) => b.code).join(',');
+        const names = branches.map((b) => b.name).join(', ');
+        localStorage.setItem('branch_code', codes);
+        localStorage.setItem('branch_name', names);
+    }
+
+    /**
+     * บันทึกข้อมูลสาขาเดียวลง localStorage (backward compatibility)
      * @param {string} code - รหัสสาขา
      * @param {string} name - ชื่อสาขา
      */
     static saveBranch(code, name) {
-        localStorage.setItem('branch_code', code);
-        localStorage.setItem('branch_name', name);
+        this.saveBranches([{ code, name }]);
     }
 
     /**
-     * ดึง branch_code จาก localStorage
+     * ดึงรายการสาขาที่เลือกจาก localStorage
+     * @returns {Array} array ของสาขา [{code, name}, ...]
+     */
+    static getSelectedBranches() {
+        const branches = localStorage.getItem('selected_branches');
+        if (branches) {
+            return JSON.parse(branches);
+        }
+        // Backward compatibility: ถ้าไม่มี selected_branches ให้ใช้ branch_code/branch_name
+        const code = localStorage.getItem('branch_code');
+        const name = localStorage.getItem('branch_name');
+        if (code && name) {
+            return [{ code, name }];
+        }
+        return [];
+    }
+
+    /**
+     * ดึง branch_code จาก localStorage ในรูปแบบ 'Branch01','Branch02' สำหรับ SQL IN clause
+     * @returns {string} branch codes ในรูปแบบ 'code1','code2',...
      */
     static getBranchCode() {
-        return localStorage.getItem('branch_code');
+        const branches = this.getSelectedBranches();
+        if (branches.length === 0) {
+            return '';
+        }
+        // แปลงเป็นรูปแบบ 'Branch01','Branch02'
+        return branches.map((b) => `'${b.code}'`).join(',');
     }
 
     /**

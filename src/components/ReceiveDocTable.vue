@@ -236,6 +236,12 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
             </template>
         </Column>
 
+        <Column field="branch_code" header="สาขา" :sortable="false">
+            <template #body="{ data }">
+                <span class="font-semibold text-primary">{{ data.branch_code }}</span>
+            </template>
+        </Column>
+
         <!-- 3. เลขที่ SO -->
         <Column field="doc_ref" header="เลขที่ SO" :sortable="false" style="min-width: 12rem">
             <template #body="{ data }">
@@ -316,6 +322,7 @@ const totalPages = computed(() => Math.ceil(props.totalRecords / props.pageSize)
                         badgeClass="p-badge-success"
                     />
                     <Button v-if="canPrint(slotProps.data)" icon="pi pi-print" label="พิมพ์" size="small" severity="secondary" outlined @click="emit('print', slotProps.data)" v-tooltip.top="'พิมพ์ใบขึ้นยาง'" />
+                    <Button icon="pi pi-send" label="ยกเลิก" size="small" severity="danger" @click="emit('send-unapprove', slotProps.data)" />
                 </div>
             </template>
         </Column>

@@ -1,9 +1,9 @@
 <script setup>
-import ReceiveDocService from '@/service/ReceiveDocService';
-import ReceiveDocTable from '@/components/ReceiveDocTable.vue';
-import ReceiveDetailDialog from '@/components/ReceiveDetailDialog.vue';
-import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
 import ImageGalleryDialog from '@/components/ImageGalleryDialog.vue';
+import PrintReceiptDialog from '@/components/PrintReceiptDialog.vue';
+import ReceiveDetailDialog from '@/components/ReceiveDetailDialog.vue';
+import ReceiveDocTable from '@/components/ReceiveDocTable.vue';
+import ReceiveDocService from '@/service/ReceiveDocService';
 import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
@@ -51,6 +51,54 @@ function formatDateForAPI(date) {
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+async function confirmSendUnApprove(docData) {
+    confirmDialog.require({
+        message: `ต้องการยกเลิกอนุมัติใบรับสินค้า ${docData.doc_no} หรือไม่?`,
+        header: 'ยืนยันการยกเลิกอนุมัติ',
+        icon: 'pi pi-send',
+        acceptLabel: 'ยืนยัน',
+        rejectLabel: 'ยกเลิก',
+        acceptClass: 'p-button-info',
+        rejectClass: 'p-button-secondary p-button-outlined',
+        accept: async () => {
+            await handleSendUnApprove(docData);
+        }
+    });
+}
+
+async function handleSendUnApprove(docData) {
+    loading.value = true;
+    try {
+        const result = await ReceiveDocService.sendUnApprove(docData.doc_no);
+
+        if (result.success) {
+            toast.add({
+                severity: 'success',
+                summary: 'Success',
+                detail: 'ยกเลิกสำเร็จ',
+                life: 3000
+            });
+            await loadReceiveDocs();
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Error',
+                detail: result.message || 'Failed to send unapprove',
+                life: 3000
+            });
+        }
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Error',
+            detail: 'An error occurred while sending unapprove',
+            life: 3000
+        });
+    } finally {
+        loading.value = false;
+    }
 }
 
 async function loadReceiveDocs() {
@@ -184,12 +232,12 @@ async function handlePrint(doc) {
     try {
         // โหลดข้อมูล document และ items
         const result = await ReceiveDocService.getReceiveDocDetail(doc.doc_no);
-        
+
         if (result.success) {
             // คำนวณยอดรวมของ SO และ Receive
             const totalSOQty = (result.details_so || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
             const totalReceiveQty = (result.details_receive || []).reduce((sum, item) => sum + (parseInt(item.qty) || 0), 0);
-            
+
             // เช็คว่าจำนวนที่รับเท่ากับ SO หรือไม่
             if (totalReceiveQty !== totalSOQty) {
                 toast.add({
@@ -200,12 +248,12 @@ async function handlePrint(doc) {
                 });
                 return;
             }
-            
+
             // เตรียมข้อมูล document
             printDocumentData.value = doc;
-            
+
             // แปลง receive details เป็นรูปแบบที่ PrintReceiptDialog ต้องการ
-            printItems.value = (result.details_receive || []).map(item => ({
+            printItems.value = (result.details_receive || []).map((item) => ({
                 item_code: item.item_code,
                 item_name: item.item_name || '',
                 unit_code: item.unit_code,
@@ -213,7 +261,7 @@ async function handlePrint(doc) {
                 item_year: item.item_year || '',
                 qty: parseInt(item.qty) || 0
             }));
-            
+
             // เปิด Print Dialog
             showPrintDialog.value = true;
         } else {
@@ -294,25 +342,30 @@ function handleImagesUpdated() {
                 </Toolbar>
             </div>
 
-            <ReceiveDocTable :data="receiveDocs" :loading="loading" :totalRecords="totalRecords" :currentPage="currentPage" :pageSize="pageSize" mode="close" @page-change="onPageChange" @view-detail="viewDetail" @close-job="confirmCloseJob" @print="handlePrint" @view-images="handleViewImages" />
+            <ReceiveDocTable
+                :data="receiveDocs"
+                :loading="loading"
+                :totalRecords="totalRecords"
+                :currentPage="currentPage"
+                :pageSize="pageSize"
+                mode="close"
+                @page-change="onPageChange"
+                @view-detail="viewDetail"
+                @close-job="confirmCloseJob"
+                @send-unapprove="confirmSendUnApprove"
+                @print="handlePrint"
+                @view-images="handleViewImages"
+            />
         </div>
 
         <!-- Dialog รายละเอียดการรับ -->
         <ReceiveDetailDialog v-model:visible="detailDialog" :loading="detailLoading" :document="selectedDoc" :soDetails="soDetails" :receiveDetails="receiveDetails" @close="closeDetailDialog" />
-        
+
         <!-- Print Receipt Dialog -->
-        <PrintReceiptDialog 
-            v-model:visible="showPrintDialog" 
-            :documentData="printDocumentData"
-            :items="printItems"
-        />
-        
+        <PrintReceiptDialog v-model:visible="showPrintDialog" :documentData="printDocumentData" :items="printItems" />
+
         <!-- Image Gallery Dialog -->
-        <ImageGalleryDialog 
-            v-model:visible="showImageGallery" 
-            :docRef="selectedDocNo"
-            @images-updated="handleImagesUpdated"
-        />
+        <ImageGalleryDialog v-model:visible="showImageGallery" :docRef="selectedDocNo" @images-updated="handleImagesUpdated" />
     </div>
 </template>
 

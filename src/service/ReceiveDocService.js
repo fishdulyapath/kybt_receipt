@@ -165,6 +165,30 @@ class ReceiveDocService {
         }
     }
 
+    // ยกเลิกอนุมัติใบรับสินค้า
+    async sendUnApprove(docno) {
+        try {
+            const provider = AuthService.getProviderName();
+            const dbname = AuthService.getDatabaseName();
+
+            const response = await axios.get(`${API_URL}/sendUnApprove`, {
+                params: {
+                    provider,
+                    dbname,
+                    docno
+                }
+            });
+
+            return response.data;
+        } catch (error) {
+            console.error('Error sending unapprove:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to send unapprove'
+            };
+        }
+    }
+
     // ปิดงานใบรับสินค้า
     async sendCloseJob(docno) {
         try {
