@@ -51,7 +51,7 @@ const handlePrint = () => {
     WinPrint.focus();
     WinPrint.print();
     WinPrint.close();
-    
+
     // ปิด Dialog หลังจากพิมพ์
     closeDialog();
 };
@@ -138,14 +138,14 @@ const formatTime = (timeStr) => {
                         <span class="total-amount">{{ totalQty }} ชิ้น</span>
                     </div>
                     <div class="slip-divider"></div>
-                    
+
                     <div class="slip-signatures">
                         <div class="sig-item">
                             <div class="sig-label">ผู้จัดสินค้า</div>
                             <div class="sig-line"></div>
                             <div class="sig-date">วันที่ ___/___/______</div>
                         </div>
-                        
+
                         <div class="sig-item">
                             <div class="sig-label">ผู้อนุมัติ</div>
                             <div class="sig-line"></div>
@@ -241,8 +241,8 @@ const formatTime = (timeStr) => {
 }
 
 .detail-left {
-    color: #2d7a2d;
-    font-weight: 500;
+    color: #000;
+    font-weight: bold;
 }
 
 .detail-right {
@@ -352,7 +352,7 @@ const formatTime = (timeStr) => {
     }
 
     .detail-left {
-        color: #2d7a2d !important;
+        color: #000 !important;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
